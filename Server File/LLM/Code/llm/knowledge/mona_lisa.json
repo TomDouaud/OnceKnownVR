@@ -1,0 +1,39 @@
+{
+  "id": "mona_lisa",
+  "title": "Mona Lisa",
+  "period": "1503-1519",
+  "origin": "Florence, Italy",
+  "content": "The Mona Lisa was painted by Leonardo da Vinci between 1503 and 1519. The subject is Lisa Gherardini, wife of Florentine merchant Francesco del Giocondo. The painting measures 77cm x 53cm and is executed in oil on a poplar wood panel. It is renowned for the subject's enigmatic smile, which Leonardo achieved using his sfumato technique — a method of blending tones so subtly that edges dissolve into shadow. The landscape behind Lisa features winding roads and a distant bridge, believed to be near Arezzo in Tuscany. The painting was stolen from the Louvre in 1911 by Vincenzo Peruggia, an Italian handyman, and recovered two years later in Florence. In this museum the frame is made of oak, acquired in 1797. The painting currently resides in the Louvre in Paris where it attracts approximately 9 million visitors per year.",
+  "regions": [
+    {
+      "label": "face and smile",
+      "description": "The famous enigmatic smile is the most debated feature in art history. Leonardo used sfumato to blur the corners of the mouth making the expression shift depending on viewing angle and lighting.",
+      "bounds": {
+        "xMin": 0.3,
+        "xMax": 0.7,
+        "yMin": 0.1,
+        "yMax": 0.45
+      }
+    },
+    {
+      "label": "hands",
+      "description": "The hands are considered one of the finest examples of Leonardo's anatomical precision. They rest in a relaxed position and are painted with extraordinary delicacy.",
+      "bounds": {
+        "xMin": 0.2,
+        "xMax": 0.8,
+        "yMin": 0.6,
+        "yMax": 0.9
+      }
+    },
+    {
+      "label": "background landscape",
+      "description": "The landscape behind Lisa is asymmetrical — the horizon on the left is lower than on the right, creating a subtle disorienting effect. The winding road and bridge are believed to reference real locations near Arezzo.",
+      "bounds": {
+        "xMin": 0,
+        "xMax": 1,
+        "yMin": 0,
+        "yMax": 0.35
+      }
+    }
+  ]
+}
