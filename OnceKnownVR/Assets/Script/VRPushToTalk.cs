@@ -3,6 +3,7 @@ using UnityEngine.InputSystem;
 using UnityEngine.Networking;
 using System.Collections;
 using System;
+using System.Collections.Generic;
 
 public class VRPushToTalk : MonoBehaviour
 {
@@ -84,6 +85,7 @@ public class VRPushToTalk : MonoBehaviour
         {
             byte[] wavData = ConvertToWav(recording, lastPos);
             StartCoroutine(SendToSTT(wavData));
+            StartCoroutine(EnvoyerAudioCoroutine(wavData));
         }
     }
 
@@ -105,6 +107,7 @@ public class VRPushToTalk : MonoBehaviour
                 
                 // Appel de la méthode pour transmettre au guide
                 EnvoyerALLM(transcription, audioData);
+                EnvoyerML(audioData);
             }
             else
             {
@@ -113,8 +116,45 @@ public class VRPushToTalk : MonoBehaviour
         }
     }
 
+    public IEnumerator EnvoyerAudioCoroutine(byte[] audioData)
+    {
+        string url = "http://100.113.97.21:3000/analyze";
+
+        // 1. Création du formulaire Multipart pour l'audio uniquement
+        List<IMultipartFormSection> formData = new List<IMultipartFormSection>();
+
+        // IMPORTANT : Le nom "file" doit correspondre à upload.single('file') dans ton index.js
+        formData.Add(new MultipartFormFileSection("file", audioData, "capture_vocale.wav", "audio/wav"));
+
+        using (UnityWebRequest www = UnityWebRequest.Post(url, formData))
+        {
+            yield return www.SendWebRequest();
+
+            if (www.result != UnityWebRequest.Result.Success)
+            {
+                Debug.LogError("<color=red>Erreur Liaison ML : </color>" + www.error);
+            }
+            else
+            {
+                // Réception de l'analyse (ex: {"detected_emotion": "happy", "instruction_llm": "..."})
+                Debug.Log("<color=cyan>Analyse d'émotion reçue : </color>" + www.downloadHandler.text);
+            }
+        }
+    }
+
+
+    void EnvoyerML( byte[] audioData)
+    {
+        Debug.Log("<color=green>Envoi de la question au guide : </color>" + audioData.Length + " bytes");
+        StartCoroutine(EnvoyerAudioCoroutine(audioData));
+    }
+    
+    
+    
     void EnvoyerALLM(string transcription, byte[] audioData)
     {
+        WWWForm form = new WWWForm();
+        form.AddBinaryData("file", audioData, "speech.wav", "audio/wav");
         Debug.Log("<color=green>Envoi de la question au guide : </color>" + transcription);
     }
 
