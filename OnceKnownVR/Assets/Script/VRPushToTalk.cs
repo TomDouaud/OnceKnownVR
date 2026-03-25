@@ -169,6 +169,8 @@ public class VRPushToTalk : MonoBehaviour
                 {
                     string emotionComplete = GetFullEmotionName(result.final_decision);
                     string couleur = GetColorForEmotion(emotionComplete);
+                    
+                    TryReadyLLM(emotion: emotionComplete);
                 
                     Debug.Log($"<color={couleur}>[ML AGENT] Émotion complète : {emotionComplete.ToUpper()}</color>");
                 }
@@ -273,9 +275,7 @@ public class VRPushToTalk : MonoBehaviour
 
     // ── HELPERS ──────────────────────────────────────────────────────────
     
-    /// <summary>
     /// Strips "data: " prefix from an SSE chunk for cleaner logging.
-    /// </summary>
     private string ParseSSEChunk(string raw)
     {
         StringBuilder clean = new StringBuilder();
@@ -338,6 +338,7 @@ public class VRPushToTalk : MonoBehaviour
                 {
                     string token = trimmed.Substring(6); // remove "data: "
                     if (token == "[DONE]") continue;
+                    if (token.StartsWith("[STATUS]")) continue;
                     clean.Append(token);
                 }
                 else if (trimmed == "data:")
