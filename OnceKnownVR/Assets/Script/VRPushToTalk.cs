@@ -4,6 +4,7 @@ using UnityEngine.Networking;
 using System.Collections;
 using System;
 using System.Collections.Generic;
+using System.Text;
 
 public class VRPushToTalk : MonoBehaviour
 {
@@ -11,31 +12,38 @@ public class VRPushToTalk : MonoBehaviour
     public InputActionProperty talkAction; 
 
     [Header("Paramètres API")]
-    // Pré-rempli avec les infos de ton infrastructure
     public string apiUrl = "https://lordnns.myftp.org/api/ai/stt/transcribe";
+    public string mlUrl  = "https://lordnns.myftp.org/api/ai/ml/analyze";
+    public string llmUrl = "https://lordnns.myftp.org/api/ai/llm/chat";
     public string apiSecret = "Pure-Gallery-Silence-01-Ethereal!";
+
+    [Header("Contexte Musée")]
+    // Set this from your game logic when the player looks at / approaches an exhibit
+    // Leave empty for general museum questions (RAG-only)
+    public string currentArtifactId = "";
 
     private AudioClip recording;
     private bool isRecording = false;
     private string deviceName;
     private const int SAMPLING_RATE = 16000;
 
+    // ── LLM COLLECTOR ───────────────────────────────────────────────────
+    // Both start null each recording cycle.
+    // Once both are filled, the LLM call fires automatically.
+    private string pendingTranscription = null;
+    private string pendingEmotion = null;
+    private bool llmAlreadySent = false;
+
     void OnEnable()
     {
-        // Active l'écoute de la touche quand le script est activé
         if (talkAction.action != null)
-        {
             talkAction.action.Enable();
-        }
     }
 
     void OnDisable()
     {
-        // Désactive l'écoute pour éviter les bugs quand l'objet est détruit/masqué
         if (talkAction.action != null)
-        {
             talkAction.action.Disable();
-        }
     }
     
     void Start()
@@ -70,6 +78,12 @@ public class VRPushToTalk : MonoBehaviour
     void StartRecording()
     {
         isRecording = true;
+
+        // Reset collector for this new cycle
+        pendingTranscription = null;
+        pendingEmotion = null;
+        llmAlreadySent = false;
+
         Debug.Log("Microphone activé...");
         recording = Microphone.Start(deviceName, false, 10, SAMPLING_RATE);
     }
@@ -80,61 +94,66 @@ public class VRPushToTalk : MonoBehaviour
         int lastPos = Microphone.GetPosition(deviceName);
         Microphone.End(deviceName);
 
-        // Si on a bien enregistré quelque chose, on l'envoie
         if (lastPos > 0)
         {
             byte[] wavData = ConvertToWav(recording, lastPos);
+
+            // Fire both in parallel — they each report back to the collector
             StartCoroutine(SendToSTT(wavData));
-            StartCoroutine(EnvoyerAudioCoroutine(wavData));
+            StartCoroutine(SendToML(wavData));
         }
     }
 
+    // ── STT ─────────────────────────────────────────────────────────────
     IEnumerator SendToSTT(byte[] audioData)
     {
         WWWForm form = new WWWForm();
         form.AddBinaryData("file", audioData, "speech.wav", "audio/wav");
 
-        Debug.Log("Envoi vers : " + apiUrl);
+        Debug.Log("Envoi STT vers : " + apiUrl);
         using (UnityWebRequest request = UnityWebRequest.Post(apiUrl, form))
         {
             request.SetRequestHeader("x-vr-app-secret", apiSecret);
-
             yield return request.SendWebRequest();
 
             if (request.result == UnityWebRequest.Result.Success)
             {
                 string transcription = request.downloadHandler.text;
-                
-                // Appel de la méthode pour transmettre au guide
-                EnvoyerALLM(transcription, audioData);
-                EnvoyerML(audioData);
+                Debug.Log("<color=green>[STT] Transcription : </color>" + transcription);
+
+                // Report to collector
+                TryReadyLLM(transcription: transcription);
             }
             else
             {
-                Debug.LogError($"Erreur de transcription : {request.error}");
+                Debug.LogError($"Erreur STT : {request.error}");
             }
         }
     }
 
-    public IEnumerator EnvoyerAudioCoroutine(byte[] audioData)
+    // ── ML (Emotion) ────────────────────────────────────────────────────
+    IEnumerator SendToML(byte[] audioData)
     {
         WWWForm form = new WWWForm();
         form.AddBinaryData("file", audioData, "capture.wav", "audio/wav");
 
-        // L'URL de TON agent ML sur la Gateway
-        string mlUrl = "https://lordnns.myftp.org/api/ai/ml/analyze";
-
+        Debug.Log("Envoi ML vers : " + mlUrl);
         using (UnityWebRequest request = UnityWebRequest.Post(mlUrl, form))
         {
-            // Utilise exactement le même secret que dans SendToSTT
             request.SetRequestHeader("x-vr-app-secret", apiSecret);
-
             yield return request.SendWebRequest();
 
             if (request.result == UnityWebRequest.Result.Success)
             {
-                // Ici, tu reçois ton JSON avec final_decision
-                Debug.Log("<color=cyan>Réponse ML reçue : </color>" + request.downloadHandler.text);
+                string responseJson = request.downloadHandler.text;
+                Debug.Log("<color=cyan>[ML] Réponse : </color>" + responseJson);
+
+                // Parse the emotion from the ML response
+                MlResponse mlResult = JsonUtility.FromJson<MlResponse>(responseJson);
+                string emotion = (mlResult != null) ? mlResult.final_decision : "unknown";
+
+                // Report to collector
+                TryReadyLLM(emotion: emotion);
             }
             else
             {
@@ -142,33 +161,165 @@ public class VRPushToTalk : MonoBehaviour
             }
         }
     }
-    
-    private string GetColorForEmotion(string emotion) {
-        switch(emotion) {
-            case "happy": return "yellow";
-            case "angry": return "red";
-            case "sad": return "blue";
-            case "surprised": return "orange";
-            default: return "green";
+
+    // ── COLLECTOR — fires LLM once both pieces arrive ───────────────────
+    void TryReadyLLM(string transcription = null, string emotion = null)
+    {
+        // Store whichever value just came in
+        if (transcription != null) pendingTranscription = transcription;
+        if (emotion != null)       pendingEmotion = emotion;
+
+        // Both ready? Fire once.
+        if (pendingTranscription != null && pendingEmotion != null && !llmAlreadySent)
+        {
+            llmAlreadySent = true;
+            Debug.Log($"<color=yellow>[COLLECTOR] Both ready — STT: \"{pendingTranscription}\" | Emotion: {pendingEmotion}</color>");
+            StartCoroutine(SendToLLM(pendingTranscription, pendingEmotion));
         }
     }
 
-
-    void EnvoyerML( byte[] audioData)
+    // ── LLM STREAMING CALL ──────────────────────────────────────────────
+    IEnumerator SendToLLM(string transcription, string emotion)
     {
-        StartCoroutine(EnvoyerAudioCoroutine(audioData));
-    }
-    
-    
-    
-    void EnvoyerALLM(string transcription, byte[] audioData)
-    {
-        WWWForm form = new WWWForm();
-        form.AddBinaryData("file", audioData, "speech.wav", "audio/wav");
-        Debug.Log("<color=green>Envoi de la question au guide : </color>" + transcription);
+        Debug.Log("<color=green>[LLM] Envoi au guide...</color>");
+
+        string jsonBody = JsonUtility.ToJson(new LlmRequest
+        {
+            prompt = transcription,
+            emotion = emotion,
+            artifactId = string.IsNullOrEmpty(currentArtifactId) ? null : currentArtifactId,
+            stream = true
+        });
+
+        Debug.Log("<color=yellow>[LLM] Payload : </color>" + jsonBody);
+
+        byte[] bodyRaw = Encoding.UTF8.GetBytes(jsonBody);
+
+        using (UnityWebRequest request = new UnityWebRequest(llmUrl, "POST"))
+        {
+            request.uploadHandler = new UploadHandlerRaw(bodyRaw);
+            request.downloadHandler = new StreamingDownloadHandler();
+            request.SetRequestHeader("Content-Type", "application/json");
+            request.SetRequestHeader("x-vr-app-secret", apiSecret);
+
+            var op = request.SendWebRequest();
+            StreamingDownloadHandler streamHandler = (StreamingDownloadHandler)request.downloadHandler;
+
+            // Poll for new chunks while the request is in-flight
+            while (!op.isDone)
+            {
+                string chunk = streamHandler.ConsumeNewData();
+                if (!string.IsNullOrEmpty(chunk))
+                {
+                    Debug.Log("<color=cyan>[LLM stream] </color>" + ParseSSEChunk(chunk));
+                }
+                yield return null;
+            }
+
+            // Grab any remaining data
+            string remaining = streamHandler.ConsumeNewData();
+            if (!string.IsNullOrEmpty(remaining))
+            {
+                Debug.Log("<color=cyan>[LLM stream] </color>" + ParseSSEChunk(remaining));
+            }
+
+            if (request.result == UnityWebRequest.Result.Success)
+            {
+                string fullResponse = streamHandler.GetFullText();
+                Debug.Log("<color=green>[LLM COMPLETE] </color>" + fullResponse);
+
+                // TODO: pass fullResponse + emotion to TTS or UI
+            }
+            else
+            {
+                Debug.LogError($"Erreur LLM (Code {request.responseCode}) : {request.error}");
+            }
+        }
     }
 
-    // --- NOUVELLE CONVERSION AVEC EN-TÊTE WAV OFFICIEL ---
+    // ── HELPERS ──────────────────────────────────────────────────────────
+    
+    /// <summary>
+    /// Strips "data: " prefix from an SSE chunk for cleaner logging.
+    /// </summary>
+    private string ParseSSEChunk(string raw)
+    {
+        StringBuilder clean = new StringBuilder();
+        string[] lines = raw.Split('\n');
+        foreach (string line in lines)
+        {
+            string trimmed = line.Trim();
+            if (trimmed.StartsWith("data: "))
+            {
+                string token = trimmed.Substring(6);
+                if (token == "[DONE]") continue;
+                clean.Append(token);
+            }
+        }
+        return clean.ToString();
+    }
+
+    private string GetColorForEmotion(string emotion)
+    {
+        switch (emotion)
+        {
+            case "happy":     return "yellow";
+            case "angry":     return "red";
+            case "sad":       return "blue";
+            case "surprised": return "orange";
+            default:          return "green";
+        }
+    }
+
+    // ── CUSTOM STREAMING DOWNLOAD HANDLER ───────────────────────────────
+    private class StreamingDownloadHandler : DownloadHandlerScript
+    {
+        private StringBuilder fullText = new StringBuilder();
+        private int lastReadIndex = 0;
+
+        protected override bool ReceiveData(byte[] data, int dataLength)
+        {
+            string text = Encoding.UTF8.GetString(data, 0, dataLength);
+            fullText.Append(text);
+            return true;
+        }
+
+        public string ConsumeNewData()
+        {
+            if (fullText.Length <= lastReadIndex) return null;
+            string newData = fullText.ToString(lastReadIndex, fullText.Length - lastReadIndex);
+            lastReadIndex = fullText.Length;
+            return newData;
+        }
+
+        public string GetFullText()
+        {
+            // Parse SSE format: strip "data: " prefixes, skip [DONE], join tokens
+            StringBuilder clean = new StringBuilder();
+            string[] lines = fullText.ToString().Split('\n');
+            foreach (string line in lines)
+            {
+                string trimmed = line.Trim();
+                if (trimmed.StartsWith("data: "))
+                {
+                    string token = trimmed.Substring(6); // remove "data: "
+                    if (token == "[DONE]") continue;
+                    clean.Append(token);
+                }
+                else if (trimmed == "data:")
+                {
+                    // empty data line = paragraph break
+                    clean.Append("\n\n");
+                }
+            }
+            return clean.ToString().Trim();
+        }
+
+        protected override void CompleteContent() { }
+        protected override float GetProgress() => 0;
+    }
+
+    // ── WAV CONVERSION ──────────────────────────────────────────────────
     byte[] ConvertToWav(AudioClip clip, int length)
     {
         float[] samples = new float[length * clip.channels];
@@ -182,27 +333,24 @@ public class VRPushToTalk : MonoBehaviour
         {
             using (System.IO.BinaryWriter writer = new System.IO.BinaryWriter(memoryStream))
             {
-                // 1. CRÉATION DE L'EN-TÊTE WAV (44 octets)
                 writer.Write(System.Text.Encoding.ASCII.GetBytes("RIFF"));
-                writer.Write(36 + samplesCount * 2); 
+                writer.Write(36 + samplesCount * 2);
                 writer.Write(System.Text.Encoding.ASCII.GetBytes("WAVE"));
-                
+
                 writer.Write(System.Text.Encoding.ASCII.GetBytes("fmt "));
-                writer.Write(16); // Taille du chunk fmt
-                writer.Write((short)1); // Format audio (1 = PCM)
-                writer.Write((short)channels); // Nombre de canaux
-                writer.Write(hz); // Fréquence d'échantillonnage
-                writer.Write(hz * channels * 2); // Byte rate
-                writer.Write((short)(channels * 2)); // Block align
-                writer.Write((short)16); // Bits par échantillon
+                writer.Write(16);
+                writer.Write((short)1);
+                writer.Write((short)channels);
+                writer.Write(hz);
+                writer.Write(hz * channels * 2);
+                writer.Write((short)(channels * 2));
+                writer.Write((short)16);
 
                 writer.Write(System.Text.Encoding.ASCII.GetBytes("data"));
-                writer.Write(samplesCount * 2); // Taille des données audio
+                writer.Write(samplesCount * 2);
 
-                // 2. ÉCRITURE DES DONNÉES AUDIO (PCM 16-bit)
                 for (int i = 0; i < samplesCount; i++)
                 {
-                    // Convertit les float d'Unity (-1.0 à 1.0) en short PCM (-32768 à 32767)
                     short intSample = (short)(samples[i] * 32767f);
                     writer.Write(intSample);
                 }
@@ -212,11 +360,30 @@ public class VRPushToTalk : MonoBehaviour
     }
 }
 
+// ── SERIALIZABLE CLASSES ────────────────────────────────────────────────
+
+[System.Serializable]
+public class LlmRequest
+{
+    public string prompt;
+    public string emotion;
+    public string artifactId;
+    public bool stream;
+}
+
 [System.Serializable]
 public class MlResponse
 {
     public string status;
-    public int segmentsAnalyzed;
-    public string finalDecision;
+    public int segments_analyzed;
+    public List<MlSegment> detail;
+    public string final_decision;
+}
 
+[System.Serializable]
+public class MlSegment
+{
+    public float start_sec;
+    public string emotion;
+    public float confidence;
 }
