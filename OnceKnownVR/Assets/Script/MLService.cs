@@ -49,21 +49,37 @@ public class MLService : MonoBehaviour
     
     /// Send the complete WAV for emotion analysis.
     /// Internally may chunk the upload if the payload exceeds limits (future).
-    public void Analyze(byte[] fullWavData)
+    public void AnalyzeAudio(byte[] fullWavData)
     {
-        StartCoroutine(PostFullAudio(fullWavData));
+        StartCoroutine(PostData(MLAnalysisType.Audio, fullWavData, null));
+    }
+
+    public void AnalyzeText(string transcription)
+    {
+        StartCoroutine(PostData(MLAnalysisType.Text, null, transcription));
     }
 
     // ════════════════════════════════════════════════════════════════════════
     //  Network
     // ════════════════════════════════════════════════════════════════════════
 
-    private IEnumerator PostFullAudio(byte[] audioData)
+private IEnumerator PostData(MLAnalysisType type, byte[] audioData, string transcription)
     {
         WWWForm form = new WWWForm();
-        form.AddBinaryData("file", audioData, "capture.wav", "audio/wav");
 
-        Debug.Log("[ML] Envoi vers : " + mlUrl);
+        // On construit le formulaire selon ce qu'on a reçu
+        if (type == MLAnalysisType.Audio && audioData != null)
+        {
+            form.AddBinaryData("file", audioData, "capture.wav", "audio/wav");
+        }
+        else if (type == MLAnalysisType.Text && !string.IsNullOrEmpty(transcription))
+        {
+            form.AddField("transcription", transcription);
+        }
+
+        string typeName = type == MLAnalysisType.Audio ? "AUDIO" : "TEXTE";
+        Debug.Log($"[ML] Envoi {typeName} vers : " + mlUrl);
+
         using (UnityWebRequest request = UnityWebRequest.Post(mlUrl, form))
         {
             request.SetRequestHeader("x-vr-app-secret", apiSecret);
@@ -71,38 +87,26 @@ public class MLService : MonoBehaviour
 
             if (request.result != UnityWebRequest.Result.Success)
             {
-                string responseJson = request.downloadHandler.text;
-                Debug.Log("<color=cyan>[ML] Réponse (erreur réseau) : </color>" + responseJson);
-
-                MlResponse mlResult = JsonUtility.FromJson<MlResponse>(responseJson);
-                string emotion = (mlResult != null) ? mlResult.final_decision : "unknown";
-
-                OnEmotionDetected?.Invoke(this,
-                    new MLResultEventArgs(emotion, responseJson, success: false, error: request.error));
+                Debug.Log($"<color=cyan>[ML] Erreur réseau ({typeName}) : </color>" + request.error);
+                OnEmotionDetectedRaw?.Invoke(type, "unknown", request.downloadHandler.text, false, request.error);
             }
             else
             {
                 string jsonResponse = request.downloadHandler.text;
-                Debug.Log("<color=grey>[ML] JSON brut reçu : </color>" + jsonResponse);
-
                 MlResponse result = JsonUtility.FromJson<MlResponse>(jsonResponse);
 
                 if (result != null && result.status == "success")
                 {
                     string emotionFull = GetFullEmotionName(result.final_decision);
-                    string colour      = GetColorForEmotion(emotionFull);
+                    string colour = GetColorForEmotion(emotionFull);
 
-                    Debug.Log($"<color={colour}>[ML AGENT] Émotion : {emotionFull.ToUpper()}</color>");
-
-                    OnEmotionDetected?.Invoke(this,
-                        new MLResultEventArgs(emotionFull, jsonResponse, success: true));
+                    Debug.Log($"<color={colour}>[ML AGENT - {typeName}] Émotion : {emotionFull.ToUpper()}</color>");
+                    OnEmotionDetectedRaw?.Invoke(type, emotionFull, jsonResponse, true, null);
                 }
                 else
                 {
-                    Debug.LogWarning("Réponse reçue, mais impossible de lire 'final_decision'.");
-                    OnEmotionDetected?.Invoke(this,
-                        new MLResultEventArgs("unknown", jsonResponse, success: false,
-                                               error: "Could not parse final_decision"));
+                    Debug.LogWarning($"[{typeName}] Impossible de lire 'final_decision'.");
+                    OnEmotionDetectedRaw?.Invoke(type, "unknown", jsonResponse, false, "Could not parse final_decision");
                 }
             }
         }
