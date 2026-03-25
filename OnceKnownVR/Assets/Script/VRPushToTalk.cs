@@ -134,6 +134,9 @@ public class VRPushToTalk : MonoBehaviour
     // ── ML (Emotion) ────────────────────────────────────────────────────
     IEnumerator SendToML(byte[] audioData)
     {
+        string mlUrl = "https://lordnns.myftp.org/api/ai/ml/analyze";
+
+        // Utilisation de WWWForm (la méthode robuste pour votre Gateway)
         WWWForm form = new WWWForm();
         form.AddBinaryData("file", audioData, "capture.wav", "audio/wav");
 
@@ -143,7 +146,7 @@ public class VRPushToTalk : MonoBehaviour
             request.SetRequestHeader("x-vr-app-secret", apiSecret);
             yield return request.SendWebRequest();
 
-            if (request.result == UnityWebRequest.Result.Success)
+            if (request.result != UnityWebRequest.Result.Success)
             {
                 string responseJson = request.downloadHandler.text;
                 Debug.Log("<color=cyan>[ML] Réponse : </color>" + responseJson);
@@ -157,7 +160,22 @@ public class VRPushToTalk : MonoBehaviour
             }
             else
             {
-                Debug.LogError($"Erreur ML (Code {request.responseCode}) : {request.error}");
+                string jsonResponse = request.downloadHandler.text;
+                Debug.Log("<color=grey>JSON brut reçu du serveur : </color>" + jsonResponse);
+                
+                MlResponse result = JsonUtility.FromJson<MlResponse>(jsonResponse);
+                
+                if (result != null && result.status == "success")
+                {
+                    string emotionComplete = GetFullEmotionName(result.final_decision);
+                    string couleur = GetColorForEmotion(emotionComplete);
+                
+                    Debug.Log($"<color={couleur}>[ML AGENT] Émotion complète : {emotionComplete.ToUpper()}</color>");
+                }
+                else
+                {
+                    Debug.LogWarning("Réponse reçue, mais impossible de lire 'final_decision'.");
+                }
             }
         }
     }
@@ -178,6 +196,22 @@ public class VRPushToTalk : MonoBehaviour
         }
     }
 
+    private string GetFullEmotionName(string shortEmotion)
+    {
+        if (string.IsNullOrEmpty(shortEmotion)) return "Inconnu";
+    
+        switch(shortEmotion.ToLower())
+        {
+            case "neu": return "Neutral";
+            case "hap": return "Happy";
+            case "ang": return "Angry";
+            case "sad": return "Sad";
+            case "exc": return "Excited";
+            case "fru": return "Frustrated";
+            default: return shortEmotion; 
+        }
+    }
+    
     // ── LLM STREAMING CALL ──────────────────────────────────────────────
     IEnumerator SendToLLM(string transcription, string emotion)
     {
