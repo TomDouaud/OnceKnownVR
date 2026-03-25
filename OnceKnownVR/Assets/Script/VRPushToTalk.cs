@@ -12,7 +12,7 @@ public class VRPushToTalk : MonoBehaviour
 
     [Header("Paramètres API")]
     // Pré-rempli avec les infos de ton infrastructure
-    public string apiUrl = "https://lordnns.myftp.org/api/ai/stt"; 
+    public string apiUrl = "https://lordnns.myftp.org/api/ai/stt/transcribe";
     public string apiSecret = "Pure-Gallery-Silence-01-Ethereal!";
 
     private AudioClip recording;
@@ -118,34 +118,44 @@ public class VRPushToTalk : MonoBehaviour
 
     public IEnumerator EnvoyerAudioCoroutine(byte[] audioData)
     {
-        string url = "http://100.113.97.21:3000/analyze";
+        WWWForm form = new WWWForm();
+        form.AddBinaryData("file", audioData, "capture.wav", "audio/wav");
 
-        // 1. Création du formulaire Multipart pour l'audio uniquement
-        List<IMultipartFormSection> formData = new List<IMultipartFormSection>();
+        // L'URL de TON agent ML sur la Gateway
+        string mlUrl = "https://lordnns.myftp.org/api/ai/ml/analyze";
 
-        // IMPORTANT : Le nom "file" doit correspondre à upload.single('file') dans ton index.js
-        formData.Add(new MultipartFormFileSection("file", audioData, "capture_vocale.wav", "audio/wav"));
-
-        using (UnityWebRequest www = UnityWebRequest.Post(url, formData))
+        using (UnityWebRequest request = UnityWebRequest.Post(mlUrl, form))
         {
-            yield return www.SendWebRequest();
+            // Utilise exactement le même secret que dans SendToSTT
+            request.SetRequestHeader("x-vr-app-secret", apiSecret);
 
-            if (www.result != UnityWebRequest.Result.Success)
+            yield return request.SendWebRequest();
+
+            if (request.result == UnityWebRequest.Result.Success)
             {
-                Debug.LogError("<color=red>Erreur Liaison ML : </color>" + www.error);
+                // Ici, tu reçois ton JSON avec final_decision
+                Debug.Log("<color=cyan>Réponse ML reçue : </color>" + request.downloadHandler.text);
             }
             else
             {
-                // Réception de l'analyse (ex: {"detected_emotion": "happy", "instruction_llm": "..."})
-                Debug.Log("<color=cyan>Analyse d'émotion reçue : </color>" + www.downloadHandler.text);
+                Debug.LogError($"Erreur ML (Code {request.responseCode}) : {request.error}");
             }
+        }
+    }
+    
+    private string GetColorForEmotion(string emotion) {
+        switch(emotion) {
+            case "happy": return "yellow";
+            case "angry": return "red";
+            case "sad": return "blue";
+            case "surprised": return "orange";
+            default: return "green";
         }
     }
 
 
     void EnvoyerML( byte[] audioData)
     {
-        Debug.Log("<color=green>Envoi de la question au guide : </color>" + audioData.Length + " bytes");
         StartCoroutine(EnvoyerAudioCoroutine(audioData));
     }
     
@@ -200,4 +210,13 @@ public class VRPushToTalk : MonoBehaviour
             return memoryStream.ToArray();
         }
     }
+}
+
+[System.Serializable]
+public class MlResponse
+{
+    public string status;
+    public int segmentsAnalyzed;
+    public string finalDecision;
+
 }
