@@ -22,6 +22,12 @@ public class VRPushToTalk : MonoBehaviour
     // Leave empty for general museum questions (RAG-only)
     public string currentArtifactId = "";
 
+    [Header("Microphone")]
+    // List of detected microphones — populated on Start and when RefreshMicrophones() is called
+    public List<string> availableMicrophones = new List<string>();
+    // Change this at runtime (from UI dropdown, etc.) to switch mic. Index into availableMicrophones.
+    public int selectedMicrophoneIndex = 0;
+
     private AudioClip recording;
     private bool isRecording = false;
     private string deviceName;
@@ -48,13 +54,58 @@ public class VRPushToTalk : MonoBehaviour
     
     void Start()
     {
-        if (Microphone.devices.Length > 0)
+        RefreshMicrophones();
+    }
+
+    /// <summary>
+    /// Call this to re-scan available microphones (e.g. when a headset is plugged in).
+    /// </summary>
+    public void RefreshMicrophones()
+    {
+        availableMicrophones.Clear();
+        availableMicrophones.AddRange(Microphone.devices);
+
+        if (availableMicrophones.Count == 0)
         {
-            Debug.Log("Micro détecté : " + Microphone.devices[0]);
-            deviceName = Microphone.devices[0];
-        }
-        else
             Debug.LogError("Aucun micro détecté.");
+            deviceName = null;
+            return;
+        }
+
+        // Log all detected mics
+        for (int i = 0; i < availableMicrophones.Count; i++)
+        {
+            Debug.Log($"<color=cyan>[MIC {i}]</color> {availableMicrophones[i]}");
+        }
+
+        // Clamp index and select
+        SelectMicrophone(selectedMicrophoneIndex);
+        
+        if (VRDebugPanel.instance != null)
+            VRDebugPanel.instance.PopulateMicDropdown();
+    }
+
+    /// <summary>
+    /// Switch to a different microphone by index. Safe to call at runtime from UI.
+    /// </summary>
+    public void SelectMicrophone(int index)
+    {
+        if (availableMicrophones.Count == 0)
+        {
+            Debug.LogError("Aucun micro disponible.");
+            return;
+        }
+
+        selectedMicrophoneIndex = Mathf.Clamp(index, 0, availableMicrophones.Count - 1);
+        deviceName = availableMicrophones[selectedMicrophoneIndex];
+        Debug.Log($"<color=green>[MIC] Sélectionné : </color>{deviceName} (index {selectedMicrophoneIndex})");
+
+        // If we were recording with the old mic, stop it
+        if (isRecording)
+        {
+            Microphone.End(null);
+            isRecording = false;
+        }
     }
 
     void Update()
