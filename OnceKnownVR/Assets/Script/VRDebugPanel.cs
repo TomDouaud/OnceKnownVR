@@ -8,7 +8,6 @@ public class VRDebugPanel : MonoBehaviour
     public static VRDebugPanel instance;
 
     [Header("Références")]
-    public VRPushToTalk pushToTalk;
     public Transform xrOrigin;
 
     [Header("Toggle UI")]
@@ -35,12 +34,14 @@ public class VRDebugPanel : MonoBehaviour
 
     private static readonly Dictionary<string, string> tagColors = new Dictionary<string, string>
     {
-        { "[STT]",       "#55FF55" },
-        { "[ML]",        "#55FFFF" },
+        { "[STT",        "#55FF55" },
+        { "[ML",         "#55FFFF" },
         { "[LLM",        "#FFFF55" },
+        { "[TTS",        "#FF88FF" },
         { "[COLLECTOR]", "#FFAA00" },
         { "[MIC",        "#55FFFF" },
         { "[STATUS]",    "#888888" },
+        { "Orchestrator","#FFAA00" },
         { "Erreur",      "#FF5555" },
         { "Error",       "#FF5555" }
     };
@@ -126,31 +127,31 @@ public class VRDebugPanel : MonoBehaviour
     // ── MIC DROPDOWN ────────────────────────────────────────────────────
     public void PopulateMicDropdown()
     {
-        if (micDropdown == null || pushToTalk == null) return;
+        if (micDropdown == null || AudioRecorder.Instance == null) return;
 
         micDropdown.ClearOptions();
 
-        if (pushToTalk.availableMicrophones.Count == 0)
+        if (AudioRecorder.Instance.availableMicrophones.Count == 0)
         {
             micDropdown.AddOptions(new List<string> { "No microphone found" });
             return;
         }
 
-        micDropdown.AddOptions(pushToTalk.availableMicrophones);
-        micDropdown.value = pushToTalk.selectedMicrophoneIndex;
+        micDropdown.AddOptions(AudioRecorder.Instance.availableMicrophones);
+        micDropdown.value = AudioRecorder.Instance.selectedMicrophoneIndex;
         micDropdown.RefreshShownValue();
     }
 
     void OnMicSelected(int index)
     {
-        if (pushToTalk != null)
-            pushToTalk.SelectMicrophone(index);
+        if (AudioRecorder.Instance != null)
+            AudioRecorder.Instance.SelectMicrophone(index);
     }
 
     void OnRefreshClick()
     {
-        if (pushToTalk != null)
-            pushToTalk.RefreshMicrophones();
+        if (AudioRecorder.Instance != null)
+            AudioRecorder.Instance.RefreshMicrophones();
         AddLog("<color=#55FF55>Microphones refreshed</color>");
     }
 
