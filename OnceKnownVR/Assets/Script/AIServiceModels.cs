@@ -21,8 +21,9 @@ public class MlResponse
 {
     public string        status;
     public int           segments_analyzed;
-    public List<MlSegment> detail;
     public string        final_decision;
+    public string text_detected;
+    public string audio_detected;
 }
 
 [Serializable]

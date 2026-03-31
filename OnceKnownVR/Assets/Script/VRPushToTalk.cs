@@ -59,6 +59,7 @@ public class VRPushToTalk : MonoBehaviour
     private string pendingEmotion       = null;
     private bool   llmAlreadySent       = false;
 
+    private byte[] currentWavData       = null;
     // ════════════════════════════════════════════════════════════════════════
     //  Lifecycle
     // ════════════════════════════════════════════════════════════════════════
@@ -127,6 +128,7 @@ public class VRPushToTalk : MonoBehaviour
         // Reset collector
         pendingTranscription = null;
         pendingEmotion       = null;
+        currentWavData       = null;
         llmAlreadySent       = false;
 
         AudioRecorder.Instance.StartRecording();
@@ -135,15 +137,11 @@ public class VRPushToTalk : MonoBehaviour
 
     private void EndRecordingCycle()
     {
-        byte[] wavData = AudioRecorder.Instance.StopRecording();
-        if (wavData == null || wavData.Length == 0) return;
+        currentWavData = AudioRecorder.Instance.StopRecording();
+        if (currentWavData == null || currentWavData.Length == 0) return;
 
-        // ML needs the full audio — send it now
-        MLService.Instance.Analyze(wavData);
-
-        // STT: finalize (send full audio in current single-shot mode;
-        //       in future chunked mode this sends the last chunk + "end" flag)
-        STTService.Instance.FinalizeSession(wavData);
+        // ETAPE 1 : On demande d'abord la transcription au STT
+        STTService.Instance.FinalizeSession(currentWavData);
     }
 
     // ════════════════════════════════════════════════════════════════════════
