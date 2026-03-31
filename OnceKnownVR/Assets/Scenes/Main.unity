@@ -10105,7 +10105,7 @@ MonoBehaviour:
         m_Flags: 0
       m_Flags: 0
     m_Reference: {fileID: 0}
-  apiUrl: https://lordnns.myftp.org/api/ai/stt
+  apiUrl: https://lordnns.myftp.org/api/ai/stt/transcribe
   apiSecret: Pure-Gallery-Silence-01-Ethereal!
 --- !u!1001 &1877430889
 PrefabInstance:
