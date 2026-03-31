@@ -1,163 +1,216 @@
 using UnityEngine;
 using UnityEngine.InputSystem;
-using UnityEngine.Networking;
-using System.Collections;
-using System;
+
+// ════════════════════════════════════════════════════════════════════════════
+//  VRPushToTalk  (Orchestrator)
+//
+//  This is now a thin controller.  It owns ONLY:
+//      • The VR input action (trigger press / release)
+//      • The "collector" logic that waits for both STT + ML before
+//        firing the LLM.
+//
+//  All heavy lifting lives in the singleton services:
+//      AudioRecorder   – microphone & WAV encoding
+//      STTService      – speech-to-text
+//      MLService       – emotion analysis
+//      LLMService      – streaming LLM chat
+//      TTSService      – text-to-speech (placeholder)
+//
+//  ── Data-flow diagram ─────────────────────────────────────────────────
+//
+//   [Trigger Press]
+//       │
+//       ├─► AudioRecorder.StartRecording()
+//       └─► STTService.BeginSession()      // reset accumulators
+//               │
+//               │  (while held — future chunked STT path)
+//               │  STTService.SendChunk(partialWav)
+//               │      └──► OnChunkResult  → build partial text for UI
+//               │
+//   [Trigger Release]
+//       │
+//       ├─► wavData = AudioRecorder.StopRecording()
+//       │
+//       ├─► MLService.Analyze(wavData)            // needs full audio
+//       │       └──► OnEmotionDetected ──┐
+//       │                                │
+//       └─► STTService.FinalizeSession(wavData)   // last chunk + finish
+//               └──► OnTranscriptionComplete ──┐
+//                                              │
+//                    ┌─────────────────────────┘
+//                    │  COLLECTOR: both arrived?
+//                    ▼
+//              LLMService.Send(text, emotion)
+//                    │
+//                    ├──► OnTokenReceived   → TTSService.FeedToken(token)
+//                    │                        (+ update UI live)
+//                    │
+//                    └──► OnResponseComplete → TTSService.Finalize()
+//                                              (+ final UI update)
+// ════════════════════════════════════════════════════════════════════════════
 
 public class VRPushToTalk : MonoBehaviour
 {
-    [Header("Configuration Touche")]
-    public InputActionProperty talkAction; 
+    [Header("VR Input")]
+    public InputActionProperty talkAction;
 
-    [Header("Paramètres API")]
-    // Pré-rempli avec les infos de ton infrastructure
-    public string apiUrl = "https://lordnns.myftp.org/api/ai/stt"; 
-    public string apiSecret = "Pure-Gallery-Silence-01-Ethereal!";
+    // ── Collector state ────────────────────────────────────────────────────
+    private string pendingTranscription = null;
+    private string pendingEmotion       = null;
+    private bool   llmAlreadySent       = false;
 
-    private AudioClip recording;
-    private bool isRecording = false;
-    private string deviceName;
-    private const int SAMPLING_RATE = 16000;
+    // ════════════════════════════════════════════════════════════════════════
+    //  Lifecycle
+    // ════════════════════════════════════════════════════════════════════════
 
     void OnEnable()
     {
-        // Active l'écoute de la touche quand le script est activé
         if (talkAction.action != null)
-        {
             talkAction.action.Enable();
+
+        // Subscribe to service events
+        if (STTService.Instance != null)
+            STTService.Instance.OnTranscriptionComplete += OnSTTComplete;
+        if (MLService.Instance != null)
+            MLService.Instance.OnEmotionDetected += OnMLComplete;
+        if (LLMService.Instance != null)
+        {
+            LLMService.Instance.OnTokenReceived    += OnLLMToken;
+            LLMService.Instance.OnResponseComplete += OnLLMComplete;
         }
     }
 
     void OnDisable()
     {
-        // Désactive l'écoute pour éviter les bugs quand l'objet est détruit/masqué
         if (talkAction.action != null)
-        {
             talkAction.action.Disable();
-        }
-    }
-    
-    void Start()
-    {
-        if (Microphone.devices.Length > 0)
+
+        if (STTService.Instance != null)
+            STTService.Instance.OnTranscriptionComplete -= OnSTTComplete;
+        if (MLService.Instance != null)
+            MLService.Instance.OnEmotionDetected -= OnMLComplete;
+        if (LLMService.Instance != null)
         {
-            Debug.Log("Micro détecté : " + Microphone.devices[0]);
-            deviceName = Microphone.devices[0];
+            LLMService.Instance.OnTokenReceived    -= OnLLMToken;
+            LLMService.Instance.OnResponseComplete -= OnLLMComplete;
         }
-        else
-            Debug.LogError("Aucun micro détecté.");
     }
+
+    // ════════════════════════════════════════════════════════════════════════
+    //  Update — input polling  (same trigger logic as before)
+    // ════════════════════════════════════════════════════════════════════════
 
     void Update()
     {
-        if (talkAction.action == null) return;
+        if (talkAction.action == null || !AudioRecorder.Instance) return;
 
         float triggerValue = talkAction.action.ReadValue<float>();
 
-        if (triggerValue > 0.5f && !isRecording)
+        if (triggerValue > 0.5f && !AudioRecorder.Instance.IsRecording)
         {
             Debug.Log("Recording...");
-            StartRecording();
+            BeginRecordingCycle();
         }
-        else if (triggerValue < 0.5f && isRecording)
+        else if (triggerValue < 0.5f && AudioRecorder.Instance.IsRecording)
         {
             Debug.Log("Stop Recording...");
-            StopRecording();
+            EndRecordingCycle();
         }
     }
 
-    void StartRecording()
+    // ════════════════════════════════════════════════════════════════════════
+    //  Recording cycle
+    // ════════════════════════════════════════════════════════════════════════
+
+    private void BeginRecordingCycle()
     {
-        isRecording = true;
-        Debug.Log("Microphone activé...");
-        recording = Microphone.Start(deviceName, false, 10, SAMPLING_RATE);
+        // Reset collector
+        pendingTranscription = null;
+        pendingEmotion       = null;
+        llmAlreadySent       = false;
+
+        AudioRecorder.Instance.StartRecording();
+        STTService.Instance.BeginSession();
     }
 
-    void StopRecording()
+    private void EndRecordingCycle()
     {
-        isRecording = false;
-        int lastPos = Microphone.GetPosition(deviceName);
-        Microphone.End(deviceName);
+        byte[] wavData = AudioRecorder.Instance.StopRecording();
+        if (wavData == null || wavData.Length == 0) return;
 
-        // Si on a bien enregistré quelque chose, on l'envoie
-        if (lastPos > 0)
+        // ML needs the full audio — send it now
+        MLService.Instance.Analyze(wavData);
+
+        // STT: finalize (send full audio in current single-shot mode;
+        //       in future chunked mode this sends the last chunk + "end" flag)
+        STTService.Instance.FinalizeSession(wavData);
+    }
+
+    // ════════════════════════════════════════════════════════════════════════
+    //  Service event handlers
+    // ════════════════════════════════════════════════════════════════════════
+
+    private void OnSTTComplete(object sender, STTChunkEventArgs e)
+    {
+        Debug.Log("<color=green>[STT → Orchestrator] </color>" + e.Text);
+        TryFireLLM(transcription: e.Text);
+    }
+
+    private void OnMLComplete(object sender, MLResultEventArgs e)
+    {
+        Debug.Log($"<color=yellow>[ML → Orchestrator] </color>{e.Emotion}");
+        TryFireLLM(emotion: e.Emotion);
+    }
+
+    private void OnLLMToken(object sender, LLMTokenEventArgs e)
+    {
+        // Forward streaming tokens to TTS (will be a no-op until implemented)
+        if (TTSService.Instance != null)
+            TTSService.Instance.FeedToken(e.Token);
+
+        // TODO: also push token to UI subtitle display
+    }
+
+    private void OnLLMComplete(object sender, LLMCompleteEventArgs e)
+    {
+        if (e.Success)
         {
-            byte[] wavData = ConvertToWav(recording, lastPos);
-            StartCoroutine(SendToSTT(wavData));
+            Debug.Log("<color=green>[LLM → Orchestrator] Full response ready.</color>");
+
+            // Signal TTS that the text stream is done
+            if (TTSService.Instance != null)
+                TTSService.Instance.Complete();
+
+            // TODO: hand e.FullResponse + emotion to any remaining consumers
+        }
+        else
+        {
+            Debug.LogError("[LLM → Orchestrator] Failed: " + e.Error);
         }
     }
 
-    IEnumerator SendToSTT(byte[] audioData)
-    {
-        WWWForm form = new WWWForm();
-        form.AddBinaryData("file", audioData, "speech.wav", "audio/wav");
+    // ════════════════════════════════════════════════════════════════════════
+    //  Collector — fires LLM once both STT & ML have reported in
+    //  (same logic as the original TryReadyLLM)
+    // ════════════════════════════════════════════════════════════════════════
 
-        Debug.Log("Envoi vers : " + apiUrl);
-        using (UnityWebRequest request = UnityWebRequest.Post(apiUrl, form))
+    private void TryFireLLM(string transcription = null, string emotion = null)
+    {
+        if (transcription != null) pendingTranscription = transcription;
+        if (emotion != null)       pendingEmotion       = emotion;
+
+        if (pendingTranscription != null && pendingEmotion != null && !llmAlreadySent)
         {
-            request.SetRequestHeader("x-vr-app-secret", apiSecret);
+            llmAlreadySent = true;
 
-            yield return request.SendWebRequest();
+            Debug.Log($"<color=yellow>[COLLECTOR] Both ready — STT: \"{pendingTranscription}\" " +
+                      $"| Emotion: {pendingEmotion}</color>");
 
-            if (request.result == UnityWebRequest.Result.Success)
-            {
-                string transcription = request.downloadHandler.text;
-                
-                // Appel de la méthode pour transmettre au guide
-                EnvoyerALLM(transcription, audioData);
-            }
-            else
-            {
-                Debug.LogError($"Erreur de transcription : {request.error}");
-            }
-        }
-    }
+            // Start TTS session so it's ready to receive tokens
+            if (TTSService.Instance != null)
+                TTSService.Instance.BeginSession();
 
-    void EnvoyerALLM(string transcription, byte[] audioData)
-    {
-        Debug.Log("<color=green>Envoi de la question au guide : </color>" + transcription);
-    }
-
-    // --- NOUVELLE CONVERSION AVEC EN-TÊTE WAV OFFICIEL ---
-    byte[] ConvertToWav(AudioClip clip, int length)
-    {
-        float[] samples = new float[length * clip.channels];
-        clip.GetData(samples, 0);
-
-        int hz = SAMPLING_RATE;
-        int channels = clip.channels;
-        int samplesCount = samples.Length;
-
-        using (System.IO.MemoryStream memoryStream = new System.IO.MemoryStream())
-        {
-            using (System.IO.BinaryWriter writer = new System.IO.BinaryWriter(memoryStream))
-            {
-                // 1. CRÉATION DE L'EN-TÊTE WAV (44 octets)
-                writer.Write(System.Text.Encoding.ASCII.GetBytes("RIFF"));
-                writer.Write(36 + samplesCount * 2); 
-                writer.Write(System.Text.Encoding.ASCII.GetBytes("WAVE"));
-                
-                writer.Write(System.Text.Encoding.ASCII.GetBytes("fmt "));
-                writer.Write(16); // Taille du chunk fmt
-                writer.Write((short)1); // Format audio (1 = PCM)
-                writer.Write((short)channels); // Nombre de canaux
-                writer.Write(hz); // Fréquence d'échantillonnage
-                writer.Write(hz * channels * 2); // Byte rate
-                writer.Write((short)(channels * 2)); // Block align
-                writer.Write((short)16); // Bits par échantillon
-
-                writer.Write(System.Text.Encoding.ASCII.GetBytes("data"));
-                writer.Write(samplesCount * 2); // Taille des données audio
-
-                // 2. ÉCRITURE DES DONNÉES AUDIO (PCM 16-bit)
-                for (int i = 0; i < samplesCount; i++)
-                {
-                    // Convertit les float d'Unity (-1.0 à 1.0) en short PCM (-32768 à 32767)
-                    short intSample = (short)(samples[i] * 32767f);
-                    writer.Write(intSample);
-                }
-            }
-            return memoryStream.ToArray();
+            LLMService.Instance.Send(pendingTranscription, pendingEmotion);
         }
     }
 }
