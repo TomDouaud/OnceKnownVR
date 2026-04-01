@@ -19,6 +19,8 @@ using System.Collections;
 //      Analyze(fullWav) — the chunking is transparent.
 // ════════════════════════════════════════════════════════════════════════════
 
+public enum MLAnalysisType { Audio, Text, Multimodal }
+
 public class MLService : MonoBehaviour
 {
     // ── Singleton ──────────────────────────────────────────────────────────
@@ -58,6 +60,11 @@ public class MLService : MonoBehaviour
     {
         StartCoroutine(PostData(MLAnalysisType.Text, null, transcription));
     }
+    
+    public void AnalyzeMultimodal(byte[] fullWavData, string transcription)
+    {
+        StartCoroutine(PostData(MLAnalysisType.Multimodal, fullWavData, transcription));
+    }
 
     // ════════════════════════════════════════════════════════════════════════
     //  Network
@@ -67,17 +74,10 @@ private IEnumerator PostData(MLAnalysisType type, byte[] audioData, string trans
     {
         WWWForm form = new WWWForm();
 
-        // On construit le formulaire selon ce qu'on a reçu
-        if (type == MLAnalysisType.Audio && audioData != null)
-        {
-            form.AddBinaryData("file", audioData, "capture.wav", "audio/wav");
-        }
-        else if (type == MLAnalysisType.Text && !string.IsNullOrEmpty(transcription))
-        {
-            form.AddField("transcription", transcription);
-        }
+        if (audioData != null) form.AddBinaryData("file", audioData, "capture.wav", "audio/wav");
+        if (!string.IsNullOrEmpty(transcription)) form.AddField("transcription", transcription);
 
-        string typeName = type == MLAnalysisType.Audio ? "AUDIO" : "TEXTE";
+        string typeName = type.ToString().ToUpper();
         Debug.Log($"[ML] Envoi {typeName} vers : " + mlUrl);
 
         using (UnityWebRequest request = UnityWebRequest.Post(mlUrl, form))
@@ -87,8 +87,8 @@ private IEnumerator PostData(MLAnalysisType type, byte[] audioData, string trans
 
             if (request.result != UnityWebRequest.Result.Success)
             {
-                Debug.Log($"<color=cyan>[ML] Erreur réseau ({typeName}) : </color>" + request.error);
-                OnEmotionDetectedRaw?.Invoke(type, "unknown", request.downloadHandler.text, false, request.error);
+                Debug.Log($"<color=red>[ML] Erreur réseau ({typeName}) : </color>" + request.error);
+                OnEmotionDetected?.Invoke(this, new MLResultEventArgs("unknown", request.downloadHandler.text, false, request.error));
             }
             else
             {
@@ -101,12 +101,16 @@ private IEnumerator PostData(MLAnalysisType type, byte[] audioData, string trans
                     string colour = GetColorForEmotion(emotionFull);
 
                     Debug.Log($"<color={colour}>[ML AGENT - {typeName}] Émotion : {emotionFull.ToUpper()}</color>");
-                    OnEmotionDetectedRaw?.Invoke(type, emotionFull, jsonResponse, true, null);
+                    
+                    if (type == MLAnalysisType.Multimodal) {
+                        Debug.Log($"<color=grey>Détails -> Voix: {GetFullEmotionName(result.audio_detected)} | Texte: {GetFullEmotionName(result.text_detected)}</color>");
+                    }
+
+                    OnEmotionDetected?.Invoke(this, new MLResultEventArgs(emotionFull, jsonResponse, true));
                 }
                 else
                 {
-                    Debug.LogWarning($"[{typeName}] Impossible de lire 'final_decision'.");
-                    OnEmotionDetectedRaw?.Invoke(type, "unknown", jsonResponse, false, "Could not parse final_decision");
+                    OnEmotionDetected?.Invoke(this, new MLResultEventArgs("unknown", jsonResponse, false, "Could not parse final_decision"));
                 }
             }
         }
