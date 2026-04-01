@@ -19,7 +19,7 @@ public class AudioRecorder : MonoBehaviour
 
     // ── Constants ──────────────────────────────────────────────────────────
     public const int SAMPLING_RATE = 16000;
-    private const int MAX_RECORD_SECONDS = 10;
+    private const int MAX_RECORD_SECONDS = 300; // Augmenté pour permettre de longues phrases
 
     // ── State ──────────────────────────────────────────────────────────────
     private AudioClip recording;
@@ -45,7 +45,6 @@ public class AudioRecorder : MonoBehaviour
     //  Microphone management
     // ════════════════════════════════════════════════════════════════════════
 
-    ///Re-scan available microphones.
     public void RefreshMicrophones()
     {
         availableMicrophones.Clear();
@@ -67,7 +66,6 @@ public class AudioRecorder : MonoBehaviour
             VRDebugPanel.instance.PopulateMicDropdown();
     }
 
-    ///Switch to a different microphone by index.
     public void SelectMicrophone(int index)
     {
         if (availableMicrophones.Count == 0)
@@ -91,7 +89,6 @@ public class AudioRecorder : MonoBehaviour
     //  Recording
     // ════════════════════════════════════════════════════════════════════════
 
-    ///Begin capturing audio from the selected microphone.
     public void StartRecording()
     {
         if (IsRecording) return;
@@ -100,8 +97,6 @@ public class AudioRecorder : MonoBehaviour
         recording = Microphone.Start(deviceName, false, MAX_RECORD_SECONDS, SAMPLING_RATE);
     }
     
-    /// Stop capturing and return the full WAV byte array.
-    /// Returns null if nothing meaningful was recorded.
     public byte[] StopRecording()
     {
         if (!IsRecording) return null;
@@ -114,9 +109,6 @@ public class AudioRecorder : MonoBehaviour
         return ConvertToWav(recording, lastPos);
     }
     
-    /// While recording is active, returns the current AudioClip reference
-    /// and the number of samples recorded so far.
-    /// Useful for STT chunked streaming — callers can read partial buffers.
     public bool TryGetLiveBuffer(out AudioClip clip, out int samplesRecorded)
     {
         clip = recording;
@@ -125,18 +117,38 @@ public class AudioRecorder : MonoBehaviour
     }
 
     // ════════════════════════════════════════════════════════════════════════
-    //  WAV conversion 
+    //  WAV conversion & Chunking
     // ════════════════════════════════════════════════════════════════════════
 
-    ///Encode raw PCM samples from an AudioClip into a standard 16-bit WAV byte array.
+    /// Encode une sous-partie de l'AudioClip en WAV (Utile pour le chunking)
+    public byte[] GetWavChunk(int startSample, int lengthSamples)
+    {
+        if (recording == null) return null;
+
+        if (startSample < 0) startSample = 0;
+        if (lengthSamples <= 0) return null;
+        if (startSample + lengthSamples > recording.samples) 
+            lengthSamples = recording.samples - startSample;
+
+        float[] samples = new float[lengthSamples * recording.channels];
+        recording.GetData(samples, startSample);
+
+        return EncodeToWav(samples, recording.channels);
+    }
+
+    /// Encode tout l'audio depuis le début
     public static byte[] ConvertToWav(AudioClip clip, int sampleLength)
     {
         float[] samples = new float[sampleLength * clip.channels];
         clip.GetData(samples, 0);
+        return EncodeToWav(samples, clip.channels);
+    }
 
-        int hz       = SAMPLING_RATE;
-        int channels = clip.channels;
-        int count    = samples.Length;
+    /// Le moteur d'encodage WAV (Header 44 octets + PCM 16-bit)
+    private static byte[] EncodeToWav(float[] samples, int channels)
+    {
+        int hz = SAMPLING_RATE;
+        int count = samples.Length;
 
         using (var ms = new System.IO.MemoryStream())
         using (var w  = new System.IO.BinaryWriter(ms))
@@ -162,7 +174,6 @@ public class AudioRecorder : MonoBehaviour
                 short s = (short)(samples[i] * 32767f);
                 w.Write(s);
             }
-
             return ms.ToArray();
         }
     }

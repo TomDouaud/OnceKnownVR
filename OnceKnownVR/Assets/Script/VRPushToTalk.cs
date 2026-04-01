@@ -1,6 +1,3 @@
-using UnityEngine;
-using UnityEngine.InputSystem;
-
 // ════════════════════════════════════════════════════════════════════════════
 //  VRPushToTalk  (Orchestrator)
 //
@@ -48,6 +45,8 @@ using UnityEngine.InputSystem;
 //                    └──► OnResponseComplete → TTSService.Finalize()
 //                                              (+ final UI update)
 // ════════════════════════════════════════════════════════════════════════════
+using UnityEngine;
+using UnityEngine.InputSystem;
 
 public class VRPushToTalk : MonoBehaviour
 {
@@ -58,8 +57,14 @@ public class VRPushToTalk : MonoBehaviour
     private string pendingTranscription = null;
     private string pendingEmotion       = null;
     private bool   llmAlreadySent       = false;
-
     private byte[] currentWavData       = null;
+
+    // ── Chunking State ─────────────────────────────────────────────────────
+    private Coroutine chunkRoutine;
+    private int lastSamplePosition = 0;
+    private const float CHUNK_INTERVAL_SEC = 7f; // On traite tous les 7s
+    private const float OVERLAP_SEC = 1f;        // 1s de retour en arrière (total = 8s envoyées)
+
     // ════════════════════════════════════════════════════════════════════════
     //  Lifecycle
     // ════════════════════════════════════════════════════════════════════════
@@ -69,7 +74,6 @@ public class VRPushToTalk : MonoBehaviour
         if (talkAction.action != null)
             talkAction.action.Enable();
 
-        // Subscribe to service events
         if (STTService.Instance != null)
             STTService.Instance.OnTranscriptionComplete += OnSTTComplete;
         if (MLService.Instance != null)
@@ -98,7 +102,7 @@ public class VRPushToTalk : MonoBehaviour
     }
 
     // ════════════════════════════════════════════════════════════════════════
-    //  Update — input polling  (same trigger logic as before)
+    //  Update
     // ════════════════════════════════════════════════════════════════════════
 
     void Update()
@@ -120,28 +124,75 @@ public class VRPushToTalk : MonoBehaviour
     }
 
     // ════════════════════════════════════════════════════════════════════════
-    //  Recording cycle
+    //  Recording cycle & Chunking
     // ════════════════════════════════════════════════════════════════════════
 
     private void BeginRecordingCycle()
     {
-        // Reset collector
         pendingTranscription = null;
         pendingEmotion       = null;
         currentWavData       = null;
         llmAlreadySent       = false;
+        lastSamplePosition   = 0;
 
         AudioRecorder.Instance.StartRecording();
         STTService.Instance.BeginSession();
+
+        // On lance l'horloge des chunks
+        if (chunkRoutine != null) StopCoroutine(chunkRoutine);
+        chunkRoutine = StartCoroutine(ProcessChunksRoutine());
     }
 
     private void EndRecordingCycle()
     {
-        currentWavData = AudioRecorder.Instance.StopRecording();
-        if (currentWavData == null || currentWavData.Length == 0) return;
+        if (chunkRoutine != null) StopCoroutine(chunkRoutine);
 
-        // ETAPE 1 : On demande d'abord la transcription au STT
-        STTService.Instance.FinalizeSession(currentWavData);
+        // On gère le tout dernier morceau d'audio (ce qu'il reste depuis le dernier chunk)
+        int currentPos = Microphone.GetPosition(null);
+        int overlapSamples = (int)(OVERLAP_SEC * AudioRecorder.SAMPLING_RATE);
+        int startPos = Mathf.Max(0, lastSamplePosition - overlapSamples);
+        int length = currentPos - startPos;
+
+        if (length > 0)
+        {
+            byte[] finalWavData = AudioRecorder.Instance.GetWavChunk(startPos, length);
+            STTService.Instance.FinalizeSession(finalWavData);
+        }
+        else
+        {
+            STTService.Instance.FinalizeSession(null);
+        }
+
+        // Pour l'analyse d'émotion (ML), on envoie l'audio complet à la fin
+        currentWavData = AudioRecorder.Instance.StopRecording();
+        if (currentWavData != null && currentWavData.Length > 0)
+        {
+            if (MLService.Instance != null) MLService.Instance.AnalyzeAudio(currentWavData);
+        }
+    }
+
+    private System.Collections.IEnumerator ProcessChunksRoutine()
+    {
+        int overlapSamples = (int)(OVERLAP_SEC * AudioRecorder.SAMPLING_RATE);
+
+        while (AudioRecorder.Instance != null && AudioRecorder.Instance.IsRecording)
+        {
+            // On attend le temps du palier (7s)
+            yield return new WaitForSeconds(CHUNK_INTERVAL_SEC);
+
+            int currentPos = Microphone.GetPosition(null);
+            int startPos = Mathf.Max(0, lastSamplePosition - overlapSamples);
+            int length = currentPos - startPos;
+
+            if (length > 0)
+            {
+                byte[] chunkWav = AudioRecorder.Instance.GetWavChunk(startPos, length);
+                // On envoie le chunk partiel au STT !
+                STTService.Instance.SendChunk(chunkWav);
+                
+                lastSamplePosition = currentPos;
+            }
+        }
     }
 
     // ════════════════════════════════════════════════════════════════════════
@@ -162,11 +213,8 @@ public class VRPushToTalk : MonoBehaviour
 
     private void OnLLMToken(object sender, LLMTokenEventArgs e)
     {
-        // Forward streaming tokens to TTS (will be a no-op until implemented)
         if (TTSService.Instance != null)
             TTSService.Instance.FeedToken(e.Token);
-
-        // TODO: also push token to UI subtitle display
     }
 
     private void OnLLMComplete(object sender, LLMCompleteEventArgs e)
@@ -174,23 +222,14 @@ public class VRPushToTalk : MonoBehaviour
         if (e.Success)
         {
             Debug.Log("<color=green>[LLM → Orchestrator] Full response ready.</color>");
-
-            // Signal TTS that the text stream is done
             if (TTSService.Instance != null)
                 TTSService.Instance.Complete();
-
-            // TODO: hand e.FullResponse + emotion to any remaining consumers
         }
         else
         {
             Debug.LogError("[LLM → Orchestrator] Failed: " + e.Error);
         }
     }
-
-    // ════════════════════════════════════════════════════════════════════════
-    //  Collector — fires LLM once both STT & ML have reported in
-    //  (same logic as the original TryReadyLLM)
-    // ════════════════════════════════════════════════════════════════════════
 
     private void TryFireLLM(string transcription = null, string emotion = null)
     {
@@ -204,7 +243,6 @@ public class VRPushToTalk : MonoBehaviour
             Debug.Log($"<color=yellow>[COLLECTOR] Both ready — STT: \"{pendingTranscription}\" " +
                       $"| Emotion: {pendingEmotion}</color>");
 
-            // Start TTS session so it's ready to receive tokens
             if (TTSService.Instance != null)
                 TTSService.Instance.BeginSession();
 

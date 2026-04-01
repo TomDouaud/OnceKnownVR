@@ -3,27 +3,6 @@ using UnityEngine.Networking;
 using System;
 using System.Collections;
 
-// ════════════════════════════════════════════════════════════════════════════
-//  STTService  (Singleton)
-//
-//  Speech-to-Text service.
-//
-//  CURRENT behaviour (unchanged from original):
-//      After recording stops, receives the full WAV and sends it to the
-//      server in a single POST.  Fires OnTranscriptionComplete.
-//
-//  FUTURE chunked-streaming layout:
-//      While recording is live, the orchestrator calls SendChunk() at
-//      regular intervals with partial audio buffers.  Each chunk fires
-//      OnChunkResult with partial text.  When the orchestrator calls
-//      FinalizeSession(), the last chunk is sent with a "final" flag
-//      and OnTranscriptionComplete fires with the assembled full text.
-//
-//  The public surface is already shaped so that switching from
-//  "single-shot" to "chunked" only requires filling in the stubbed
-//  methods — no callers need to change.
-// ════════════════════════════════════════════════════════════════════════════
-
 public class STTService : MonoBehaviour
 {
     // ── Singleton ──────────────────────────────────────────────────────────
@@ -35,10 +14,7 @@ public class STTService : MonoBehaviour
     public string apiSecret = "Pure-Gallery-Silence-01-Ethereal!";
 
     // ── Events ─────────────────────────────────────────────────────────────
-    /// <summary>Fired for every chunk result (partial or final).</summary>
     public event EventHandler<STTChunkEventArgs> OnChunkResult;
-
-    /// <summary>Fired once after FinalizeSession — carries the full assembled transcription.</summary>
     public event EventHandler<STTChunkEventArgs> OnTranscriptionComplete;
 
     // ── Internal state ─────────────────────────────────────────────────────
@@ -59,49 +35,43 @@ public class STTService : MonoBehaviour
     //  Public API
     // ════════════════════════════════════════════════════════════════════════
     
-    /// Call when a new recording cycle begins.
-    /// Resets internal accumulated text.
     public void BeginSession()
     {
         assembledText = "";
         sessionActive = true;
     }
     
-    /// [FUTURE — CHUNKED STREAMING]
-    /// Send a partial audio buffer while the user is still talking.
-    /// Each call triggers OnChunkResult with partial text.
-    /// Currently a no-op; fill in when the server supports streaming STT.
     public void SendChunk(byte[] wavChunk)
     {
-        if (!sessionActive) return;
-
-        // ── TODO: implement chunked upload ──
-        // StartCoroutine(PostChunk(wavChunk, isFinal: false));
+        if (!sessionActive || wavChunk == null) return;
+        StartCoroutine(PostChunk(wavChunk, false));
     }
     
-    /// Call when recording stops.
-    /// Sends the full WAV for transcription (current behaviour).
-    /// In chunked mode this will send the last chunk with a "final" flag
-    /// and assemble the complete text.
-    public void FinalizeSession(byte[] fullWavData)
+    public void FinalizeSession(byte[] finalWavChunk)
     {
         if (!sessionActive) return;
         sessionActive = false;
 
-        // Current single-shot path
-        StartCoroutine(PostFullAudio(fullWavData));
+        if (finalWavChunk != null && finalWavChunk.Length > 0) 
+        {
+            StartCoroutine(PostChunk(finalWavChunk, true));
+        } 
+        else 
+        {
+            // S'il n'y a pas de reste audio, on déclenche juste l'événement de fin
+            OnTranscriptionComplete?.Invoke(this, new STTChunkEventArgs(assembledText, true));
+        }
     }
 
     // ════════════════════════════════════════════════════════════════════════
-    //  Network — single-shot
+    //  Network
     // ════════════════════════════════════════════════════════════════════════
 
-    private IEnumerator PostFullAudio(byte[] audioData)
+    private IEnumerator PostChunk(byte[] audioData, bool isFinal)
     {
         WWWForm form = new WWWForm();
         form.AddBinaryData("file", audioData, "speech.wav", "audio/wav");
 
-        Debug.Log("[STT] Envoi vers : " + sttUrl);
         using (UnityWebRequest request = UnityWebRequest.Post(sttUrl, form))
         {
             request.SetRequestHeader("x-vr-app-secret", apiSecret);
@@ -109,37 +79,30 @@ public class STTService : MonoBehaviour
 
             if (request.result == UnityWebRequest.Result.Success)
             {
-                string transcription = request.downloadHandler.text;
-                Debug.Log("<color=green>[STT] Transcription : </color>" + transcription);
+                string partialText = request.downloadHandler.text;
+                
+                // On ajoute un espace pour éviter de coller les mots entre les chunks
+                if (!string.IsNullOrEmpty(assembledText) && !string.IsNullOrEmpty(partialText))
+                    assembledText += " ";
+                    
+                assembledText += partialText;
+                
+                Debug.Log($"<color=cyan>[STT Chunk] </color>{partialText}");
 
-                assembledText = transcription;
+                OnChunkResult?.Invoke(this, new STTChunkEventArgs(partialText, isFinal));
 
-                OnChunkResult?.Invoke(this,
-                    new STTChunkEventArgs(transcription, isFinal: true));
-
-                OnTranscriptionComplete?.Invoke(this,
-                    new STTChunkEventArgs(assembledText, isFinal: true));
+                if (isFinal)
+                {
+                    Debug.Log($"<color=green>[STT Complet] </color>{assembledText}");
+                    OnTranscriptionComplete?.Invoke(this, new STTChunkEventArgs(assembledText, true));
+                }
             }
             else
             {
-                Debug.LogError($"Erreur STT : {request.error}");
+                Debug.LogError($"Erreur STT (Chunk) : {request.error}");
+                // Même en cas d'erreur sur le dernier chunk, on libère le système
+                if (isFinal) OnTranscriptionComplete?.Invoke(this, new STTChunkEventArgs(assembledText, true));
             }
         }
     }
-
-    // ════════════════════════════════════════════════════════════════════════
-    //  Network — chunked  (stub for future implementation)
-    // ════════════════════════════════════════════════════════════════════════
-
-    /*
-    private IEnumerator PostChunk(byte[] wavChunk, bool isFinal)
-    {
-        // TODO:
-        // 1. POST chunk to streaming STT endpoint
-        // 2. Append partial text to assembledText
-        // 3. Fire OnChunkResult with (partialText, isFinal)
-        // 4. If isFinal → fire OnTranscriptionComplete with assembledText
-        yield break;
-    }
-    */
 }
