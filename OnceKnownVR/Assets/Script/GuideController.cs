@@ -9,21 +9,23 @@ public class GuideController : MonoBehaviour
 
     [Header("References")]
     public Transform player;
-    public Transform[] museumWaypoints; // Points de passage pour la balade
-
+    public float wanderRadius = 15f; // Rayon de recherche du point
+    public float wanderTimer = 5f;   // Temps avant de changer de point
+    
     private NavMeshAgent agent;
     private Animator animator;
+    private float timer;
     private int currentWaypointIndex = 0;
 
     void Start()
     {
         agent = GetComponent<NavMeshAgent>();
         animator = GetComponent<Animator>();
+        timer = wanderTimer;
     }
 
     void Update()
     {
-        // 1. Gérer la destination selon l'état
         switch (currentState)
         {
             case GuideState.Following:
@@ -33,9 +35,7 @@ public class GuideController : MonoBehaviour
                 WanderAround();
                 break;
         }
-
-        // 2. Synchroniser l'animation avec la vitesse réelle de l'agent
-        // agent.velocity.magnitude renvoie la vitesse de déplacement exacte
+        
         animator.SetFloat("Speed", agent.velocity.magnitude);
     }
 
@@ -44,29 +44,46 @@ public class GuideController : MonoBehaviour
         if (player != null)
         {
             agent.SetDestination(player.position);
-            // Optionnel : Arrêter l'agent s'il est assez proche du joueur
             agent.stoppingDistance = 2.0f; 
         }
     }
 
     private void WanderAround()
     {
-        agent.stoppingDistance = 0f; // Il doit aller jusqu'au point
         
-        if (museumWaypoints.Length == 0) return;
+        timer += Time.deltaTime;
 
-        // Si l'agent est arrivé à destination, on passe au point suivant
-        if (!agent.pathPending && agent.remainingDistance <= agent.stoppingDistance)
+        if (timer >= wanderTimer)
         {
-            currentWaypointIndex = (currentWaypointIndex + 1) % museumWaypoints.Length;
-            agent.SetDestination(museumWaypoints[currentWaypointIndex].position);
+            Vector3 newPos = RandomNavMeshLocation(wanderRadius);
+            agent.SetDestination(newPos);
+            timer = 0;
         }
+    }
+    
+    // Fonction pour trouver une position aléatoire sur le NavMesh
+    public Vector3 RandomNavMeshLocation(float radius)
+    {
+        Vector3 randomDirection = Random.insideUnitSphere * radius;
+        randomDirection += transform.position;
+        NavMeshHit hit;
+        NavMesh.SamplePosition(randomDirection, out hit, radius, 1);
+        return hit.position;
     }
     
     // Fonction appelée par l'Animation Event de Walk_N
     public void OnFootstep(AnimationEvent animationEvent)
     {
-        // On laisse ça vide pour faire taire l'erreur !
-        // Plus tard, on pourra y coder un système de son pour les pas.
+        // TODO add sfx
+    }
+
+    public void PlayerCalled()
+    {
+        currentState = GuideState.Following;
+    }
+
+    public void Wander()
+    {
+        currentState = GuideState.Wandering;
     }
 }
