@@ -52,7 +52,6 @@ public class StreamingDownloadHandler : DownloadHandlerScript
         return clean.ToString().Trim();
     }
     
-    /// Parses raw SSE text into clean tokens for logging / display.
     public static string ParseSSEChunk(string raw)
     {
         StringBuilder clean = new StringBuilder();
@@ -63,7 +62,9 @@ public class StreamingDownloadHandler : DownloadHandlerScript
             if (trimmed.StartsWith("data: "))
             {
                 string token = trimmed.Substring(6);
-                if (token == "[DONE]") continue;
+                if (token == "[DONE]")             continue;
+                if (token.StartsWith("[STATUS]"))  continue;  // ← add this
+                if (token.StartsWith("[ERROR]"))   continue;  // ← and this
                 clean.Append(token);
             }
         }

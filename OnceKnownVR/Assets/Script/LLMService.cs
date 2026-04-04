@@ -51,21 +51,21 @@ public class LLMService : MonoBehaviour
     // ════════════════════════════════════════════════════════════════════════
     
     /// Fire the streaming LLM request.
-    public void Send(string transcription, string emotion)
+    public void Send(string transcription, string emotion, string responsePrefix = null)
     {
         if (IsBusy)
         {
             Debug.LogWarning("[LLM] Already processing a request — ignoring.");
             return;
         }
-        StartCoroutine(StreamRequest(transcription, emotion));
+        StartCoroutine(StreamRequest(transcription, emotion, responsePrefix));
     }
 
     // ════════════════════════════════════════════════════════════════════════
     //  Network — streaming
     // ════════════════════════════════════════════════════════════════════════
 
-    private IEnumerator StreamRequest(string transcription, string emotion)
+    private IEnumerator StreamRequest(string transcription, string emotion, string responsePrefix = null)
     {
         IsBusy = true;
         Debug.Log("<color=green>[LLM] Envoi au guide...</color>");
@@ -75,7 +75,8 @@ public class LLMService : MonoBehaviour
             prompt     = transcription,
             emotion    = emotion,
             artifactId = string.IsNullOrEmpty(currentArtifactId) ? null : currentArtifactId,
-            stream     = true
+            stream     = true,
+            responsePrefix = responsePrefix 
         });
 
         Debug.Log("<color=yellow>[LLM] Payload : </color>" + jsonBody);

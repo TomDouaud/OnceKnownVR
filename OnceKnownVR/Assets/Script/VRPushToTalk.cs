@@ -239,14 +239,19 @@ public class VRPushToTalk : MonoBehaviour
         if (pendingTranscription != null && pendingEmotion != null && !llmAlreadySent)
         {
             llmAlreadySent = true;
+            
+            string filler = FillerBank.Pick();
 
             Debug.Log($"<color=yellow>[COLLECTOR] Both ready — STT: \"{pendingTranscription}\" " +
-                      $"| Emotion: {pendingEmotion}</color>");
+                      $"| Emotion: {pendingEmotion} | Filler: \"{filler}\"</color>");
 
             if (TTSService.Instance != null)
+            {
                 TTSService.Instance.BeginSession();
+                TTSService.Instance.FeedToken(filler);
+            }
 
-            LLMService.Instance.Send(pendingTranscription, pendingEmotion);
+            LLMService.Instance.Send(pendingTranscription, pendingEmotion, filler);
         }
     }
 }

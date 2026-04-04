@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using UnityEngine.Serialization;
 
 // ════════════════════════════════════════════════════════════════════════════
 //  Shared data models & event args for the AI service pipeline
@@ -14,6 +15,7 @@ public class LlmRequest
     public string emotion;
     public string artifactId;
     public bool   stream;
+    public string responsePrefix; 
 }
 
 [Serializable]
