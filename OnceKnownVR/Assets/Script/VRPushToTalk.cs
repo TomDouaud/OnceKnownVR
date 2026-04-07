@@ -50,6 +50,9 @@ using UnityEngine.InputSystem;
 
 public class VRPushToTalk : MonoBehaviour
 {
+    [Header("Script Guide")]
+    public GuideController robotController;
+    
     [Header("VR Input")]
     public InputActionProperty talkAction;
 
@@ -72,7 +75,10 @@ public class VRPushToTalk : MonoBehaviour
     void OnEnable()
     {
         if (talkAction.action != null)
+        {
             talkAction.action.Enable();
+            robotController.ChangeState(2); //follow
+        }
 
         if (STTService.Instance != null)
             STTService.Instance.OnTranscriptionComplete += OnSTTComplete;
