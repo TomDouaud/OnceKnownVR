@@ -77,7 +77,8 @@ public class VRPushToTalk : MonoBehaviour
         if (talkAction.action != null)
         {
             talkAction.action.Enable();
-            robotController.ChangeState(2); //follow
+            if(robotController != null)
+                robotController.ChangeState(2); //follow
         }
 
         if (STTService.Instance != null)

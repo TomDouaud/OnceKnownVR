@@ -27,7 +27,8 @@ public class GuideController : MonoBehaviour
     void OnEnable()
     {
         // Subscribe to the event
-        TTSService.Instance.OnTTSEvent += HandleTTSEvent;
+        if(TTSService.Instance  != null)
+            TTSService.Instance.OnTTSEvent += HandleTTSEvent;
     }
 
     void OnDisable()

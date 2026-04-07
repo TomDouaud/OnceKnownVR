@@ -54,8 +54,8 @@ public class TTSService : MonoBehaviour
     public void BeginSession()
     {
         IsSpeaking = true;
-        _llmDone   = false;
-        _pending   = 0;
+        _llmDone = false;
+        _pending = 0;
         _buffer.Clear();
         _queue.Clear();
 
@@ -86,7 +86,7 @@ public class TTSService : MonoBehaviour
     public void Cancel()
     {
         IsSpeaking = false;
-        _pending   = 0;
+        _pending = 0;
         audioSource.Stop();
         _queue.Clear();
         if (_player != null) StopCoroutine(_player);
@@ -98,7 +98,7 @@ public class TTSService : MonoBehaviour
     private void FlushAtBoundary()
     {
         string buf = _buffer.ToString();
-        int idx    = buf.LastIndexOfAny(Boundaries);
+        int idx = buf.LastIndexOfAny(Boundaries);
 
         if (idx < 0 && buf.Length > 80 && buf.Contains(","))
             idx = buf.LastIndexOf(',');
@@ -114,12 +114,13 @@ public class TTSService : MonoBehaviour
 
     // ── Send to server ────────────────────────────────────────────────────
 
-    [Serializable] private class Req
+    [Serializable]
+    private class Req
     {
         public string text;
         public string voice;
-        public int    sid;
-        public float  lengthScale;
+        public int sid;
+        public float lengthScale;
     }
 
     private void Send(string sentence)
@@ -134,16 +135,16 @@ public class TTSService : MonoBehaviour
 
         byte[] body = Encoding.UTF8.GetBytes(JsonUtility.ToJson(new Req
         {
-            text        = sentence,
-            voice       = voice,
-            sid         = speakerId,
+            text = sentence,
+            voice = voice,
+            sid = speakerId,
             lengthScale = lengthScale
         }));
 
         using var req = new UnityWebRequest(ttsUrl, "POST");
-        req.uploadHandler   = new UploadHandlerRaw(body);
+        req.uploadHandler = new UploadHandlerRaw(body);
         req.downloadHandler = new DownloadHandlerBuffer();
-        req.SetRequestHeader("Content-Type",    "application/json");
+        req.SetRequestHeader("Content-Type", "application/json");
         req.SetRequestHeader("x-vr-app-secret", apiSecret);
 
         yield return req.SendWebRequest();
@@ -159,7 +160,8 @@ public class TTSService : MonoBehaviour
         if (clip != null)
         {
             _queue.Enqueue(clip);
-            OnTTSEvent?.Invoke(this, new TTSEventArgs(TTSEventArgs.Phase.ChunkReady, new AudioClipHandle { UnityClip = clip }));
+            OnTTSEvent?.Invoke(this,
+                new TTSEventArgs(TTSEventArgs.Phase.ChunkReady, new AudioClipHandle { UnityClip = clip }));
         }
 
         _pending--;
