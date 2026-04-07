@@ -132,7 +132,7 @@ private IEnumerator PostData(MLAnalysisType type, byte[] audioData, string trans
             case "sad": return "Sad";
             case "exc": return "Excited";
             case "fru": return "Frustrated";
-            default:    return shortEmotion;
+            default:    return "Neutral";
         }
     }
 

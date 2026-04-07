@@ -165,10 +165,6 @@ public class VRPushToTalk : MonoBehaviour
 
         // Pour l'analyse d'émotion (ML), on envoie l'audio complet à la fin
         currentWavData = AudioRecorder.Instance.StopRecording();
-        if (currentWavData != null && currentWavData.Length > 0)
-        {
-            if (MLService.Instance != null) MLService.Instance.AnalyzeAudio(currentWavData);
-        }
     }
 
     private System.Collections.IEnumerator ProcessChunksRoutine()
@@ -203,6 +199,10 @@ public class VRPushToTalk : MonoBehaviour
     {
         Debug.Log("<color=green>[STT → Orchestrator] </color>" + e.Text);
         TryFireLLM(transcription: e.Text);
+        if (MLService.Instance != null && currentWavData != null && currentWavData.Length > 0)
+        {
+            MLService.Instance.AnalyzeMultimodal(currentWavData, e.Text);
+        }
     }
 
     private void OnMLComplete(object sender, MLResultEventArgs e)
