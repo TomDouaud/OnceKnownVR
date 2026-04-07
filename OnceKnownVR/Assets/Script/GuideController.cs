@@ -4,7 +4,7 @@ using UnityEngine.AI;
 [RequireComponent(typeof(NavMeshAgent), typeof(Animator))]
 public class GuideController : MonoBehaviour
 {
-    public enum GuideState { Wandering, Following }
+    public enum GuideState { Wandering = 1, Following = 2}
     public GuideState currentState = GuideState.Following;
 
     [Header("References")]
@@ -15,15 +15,38 @@ public class GuideController : MonoBehaviour
     private NavMeshAgent agent;
     private Animator animator;
     private float timer;
-    private int currentWaypointIndex = 0;
+    // private int currentWaypointIndex = 0;
 
     void Start()
     {
         agent = GetComponent<NavMeshAgent>();
         animator = GetComponent<Animator>();
         timer = wanderTimer;
+        
+    }
+    void OnEnable()
+    {
+        // Subscribe to the event
+        TTSService.Instance.OnTTSEvent += HandleTTSEvent;
     }
 
+    void OnDisable()
+    {
+        // Unsubscribe to avoid memory leaks
+        if (TTSService.Instance != null)
+            TTSService.Instance.OnTTSEvent -= HandleTTSEvent;
+    }
+
+    private void HandleTTSEvent(object sender, TTSEventArgs e)
+    {
+        // Check if the phase is "Complete"
+        if (e.CurrentPhase == TTSEventArgs.Phase.Complete)
+        {
+            Debug.Log("TTS has finished speaking the entire sequence!");
+            ChangeState((int)GuideState.Wandering);
+        }
+    }
+    
     void Update()
     {
         switch (currentState)
@@ -77,13 +100,8 @@ public class GuideController : MonoBehaviour
         // TODO add sfx
     }
 
-    public void PlayerCalled()
+    public void ChangeState(int newState)
     {
-        currentState = GuideState.Following;
-    }
-
-    public void Wander()
-    {
-        currentState = GuideState.Wandering;
+        currentState = (GuideState)newState;
     }
 }
