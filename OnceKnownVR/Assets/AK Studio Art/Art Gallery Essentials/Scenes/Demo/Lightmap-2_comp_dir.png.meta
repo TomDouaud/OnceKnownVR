@@ -1,5 +1,12 @@
 fileFormatVersion: 2
 guid: ff438842a78e2024bb69a4e5442211c4
+AssetOrigin:
+  serializedVersion: 1
+  productId: 260997
+  packageName: Art Gallery Essentials
+  packageVersion: 1.0
+  assetPath: Assets/AK Studio Art/Art Gallery Essentials/Scenes/Demo/Lightmap-2_comp_dir.png
+  uploadId: 718806
 TextureImporter:
   internalIDToNameTable: []
   externalObjects: {}
@@ -128,10 +135,3 @@ TextureImporter:
   userData: 
   assetBundleName: 
   assetBundleVariant: 
-AssetOrigin:
-  serializedVersion: 1
-  productId: 260997
-  packageName: Art Gallery Essentials
-  packageVersion: 1.0
-  assetPath: Assets/AK Studio Art/Art Gallery Essentials/Scenes/Demo/Lightmap-2_comp_dir.png
-  uploadId: 718806

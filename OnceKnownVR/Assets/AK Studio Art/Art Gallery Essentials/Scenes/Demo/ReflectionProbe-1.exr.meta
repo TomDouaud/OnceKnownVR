@@ -1,5 +1,12 @@
 fileFormatVersion: 2
 guid: 8caa3b0225964ca4e9f4b2c1aa24f53a
+AssetOrigin:
+  serializedVersion: 1
+  productId: 260997
+  packageName: Art Gallery Essentials
+  packageVersion: 1.0
+  assetPath: Assets/AK Studio Art/Art Gallery Essentials/Scenes/Demo/ReflectionProbe-1.exr
+  uploadId: 718806
 TextureImporter:
   internalIDToNameTable: []
   externalObjects: {}
@@ -128,10 +135,3 @@ TextureImporter:
   userData: 
   assetBundleName: 
   assetBundleVariant: 
-AssetOrigin:
-  serializedVersion: 1
-  productId: 260997
-  packageName: Art Gallery Essentials
-  packageVersion: 1.0
-  assetPath: Assets/AK Studio Art/Art Gallery Essentials/Scenes/Demo/ReflectionProbe-1.exr
-  uploadId: 718806
