@@ -15,7 +15,7 @@ public class GuideController : MonoBehaviour
     private NavMeshAgent agent;
     private Animator animator;
     private float timer;
-    // private int currentWaypointIndex = 0;
+    private bool bLockState = false;
 
     void Start()
     {
@@ -45,7 +45,19 @@ public class GuideController : MonoBehaviour
         {
             Debug.Log("TTS has finished speaking the entire sequence!");
             ChangeState((int)GuideState.Wandering);
+            ChangeLockState(false);
         }
+
+        if (e.CurrentPhase == TTSEventArgs.Phase.ChunkReady)
+        {
+            ChangeState((int)GuideState.Following);
+            ChangeLockState(true);
+        }
+    }
+
+    private void ChangeLockState(bool lockState)
+    {
+        bLockState  = lockState;
     }
     
     void Update()
@@ -103,6 +115,10 @@ public class GuideController : MonoBehaviour
 
     public void ChangeState(int newState)
     {
-        currentState = (GuideState)newState;
+        if (!bLockState)
+        {
+            currentState = (GuideState)newState;    
+        }
+        
     }
 }
