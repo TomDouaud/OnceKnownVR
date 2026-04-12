@@ -12,6 +12,9 @@ public class VRArtifactScanner : MonoBehaviour
     [Tooltip("Pour optimiser, mets tes œuvres sur un Layer 'Interactable' et sélectionne-le ici")]
     public LayerMask interactableLayer;
 
+    /// <summary>The artifactId of whatever the laser is currently pointing at. Empty if nothing.</summary>
+    public string CurrentArtifactId { get; private set; } = "";
+
     private LineRenderer laserRenderer;
     private MuseumArtifact currentTarget;
 
@@ -50,14 +53,9 @@ public class VRArtifactScanner : MonoBehaviour
                     if (currentTarget != null) currentTarget.OnHoverEnd(); // Désélectionne l'ancienne
                     
                     currentTarget = artifact;
-                    currentTarget.OnHoverStart(); // Surbrillance de la nouvelle
-
-                    // 🚨 LA MAGIE OPÈRE ICI : On donne le contexte à l'IA !
-                    if (LLMService.Instance != null)
-                    {
-                        LLMService.Instance.currentArtifactId = currentTarget.artifactId;
-                        Debug.Log($"<color=cyan>[SCANNER] Œuvre ciblée : {currentTarget.artifactName}</color>");
-                    }
+                    currentTarget.OnHoverStart();
+                    CurrentArtifactId = currentTarget.artifactId;
+                    Debug.Log($"<color=cyan>[SCANNER] Œuvre ciblée : {currentTarget.artifactName}</color>");
                 }
             }
         }
@@ -71,11 +69,9 @@ public class VRArtifactScanner : MonoBehaviour
             {
                 currentTarget.OnHoverEnd();
                 currentTarget = null;
-
-                if (LLMService.Instance != null)
-                {
-                    LLMService.Instance.currentArtifactId = ""; // On vide le contexte
-                }
+                CurrentArtifactId = "";
+                
+                Debug.Log($"<color=cyan>[SCANNER] Œuvre ciblée : Aucune</color>");
             }
         }
     }
