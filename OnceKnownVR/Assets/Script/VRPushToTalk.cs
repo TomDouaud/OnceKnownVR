@@ -23,7 +23,6 @@ public class VRPushToTalk : MonoBehaviour
     private byte[] currentWavData       = null;
 
     // ── Chunking State ─────────────────────────────────────────────────────
-    private System.Collections.IEnumerator chunkRoutineRef;
     private Coroutine chunkRoutine;
     private int   lastSamplePosition = 0;
     private const float CHUNK_INTERVAL_SEC = 7f;
@@ -109,7 +108,7 @@ public class VRPushToTalk : MonoBehaviour
     }
 
     // ════════════════════════════════════════════════════════════════════════
-    //  Recording cycle & Chunking
+    //  Recording cycle & Chunking (Avec Mathématique de Boucle Infinie)
     // ════════════════════════════════════════════════════════════════════════
 
     private void BeginRecordingCycle()
@@ -124,9 +123,12 @@ public class VRPushToTalk : MonoBehaviour
         pendingEmotion       = null;
         currentWavData       = null;
         llmAlreadySent       = false;
-        lastSamplePosition   = 0;
 
-        AudioRecorder.Instance.StartRecording();
+        AudioRecorder.Instance.StartRecording(); // Place le marque-page initial
+        
+        // On retient la position exacte de départ dans la boucle de 5 min
+        lastSamplePosition = AudioRecorder.Instance.GetMicPosition();
+        
         STTService.Instance.BeginSession();
 
         if (chunkRoutine != null) StopCoroutine(chunkRoutine);
@@ -137,10 +139,17 @@ public class VRPushToTalk : MonoBehaviour
     {
         if (chunkRoutine != null) StopCoroutine(chunkRoutine);
 
-        int currentPos      = Microphone.GetPosition(null);
+        // --- GESTION DU TOUT DERNIER MORCEAU D'AUDIO ---
+        int currentPos      = AudioRecorder.Instance.GetMicPosition();
+        int clipSamples     = AudioRecorder.Instance.GetClipSamples();
         int overlapSamples  = (int)(OVERLAP_SEC * AudioRecorder.SAMPLING_RATE);
-        int startPos        = Mathf.Max(0, lastSamplePosition - overlapSamples);
-        int length          = currentPos - startPos;
+        
+        // Calcul du départ avec l'overlap (en gérant la boucle infinie de 5 minutes)
+        int startPos = lastSamplePosition - overlapSamples;
+        if (startPos < 0) startPos += clipSamples;
+
+        int length = currentPos - startPos;
+        if (length < 0) length += clipSamples; // Si on a passé la fin de la boucle
 
         if (length > 0)
         {
@@ -152,6 +161,7 @@ public class VRPushToTalk : MonoBehaviour
             STTService.Instance.FinalizeSession(null);
         }
 
+        // On récupère le bloc d'audio total (depuis l'appui sur le bouton) pour le ML
         currentWavData = AudioRecorder.Instance.StopRecording();
     }
 
@@ -163,14 +173,22 @@ public class VRPushToTalk : MonoBehaviour
         {
             yield return new WaitForSeconds(CHUNK_INTERVAL_SEC);
 
-            int currentPos = Microphone.GetPosition(null);
-            int startPos   = Mathf.Max(0, lastSamplePosition - overlapSamples);
-            int length     = currentPos - startPos;
+            int currentPos  = AudioRecorder.Instance.GetMicPosition();
+            int clipSamples = AudioRecorder.Instance.GetClipSamples();
+
+            // On recule d'une seconde pour l'overlap (en gérant la boucle)
+            int startPos = lastSamplePosition - overlapSamples;
+            if (startPos < 0) startPos += clipSamples;
+
+            // On calcule la taille du morceau
+            int length = currentPos - startPos;
+            if (length < 0) length += clipSamples;
 
             if (length > 0)
             {
                 byte[] chunkWav = AudioRecorder.Instance.GetWavChunk(startPos, length);
                 STTService.Instance.SendChunk(chunkWav);
+                
                 lastSamplePosition = currentPos;
             }
         }
@@ -185,6 +203,7 @@ public class VRPushToTalk : MonoBehaviour
         Debug.Log("<color=green>[STT → Orchestrator] </color>" + e.Text);
         TryFireLLM(transcription: e.Text);
 
+        // Analyse Multimodale avec le texte finalisé ET l'audio complet récupéré à la fin
         if (MLService.Instance != null && currentWavData != null && currentWavData.Length > 0)
             MLService.Instance.AnalyzeMultimodal(currentWavData, e.Text);
     }
@@ -224,14 +243,12 @@ public class VRPushToTalk : MonoBehaviour
         {
             llmAlreadySent = true;
 
-            //string filler = FillerBank.Pick();
             Debug.Log($"<color=yellow>[COLLECTOR] Both ready — STT: \"{pendingTranscription}\" " +
                       $"| Emotion: {pendingEmotion}");
 
             if (TTSService.Instance != null)
             {
                 TTSService.Instance.BeginSession();
-                //TTSService.Instance.FeedToken(filler);
             }
 
             LLMService.Instance.Send(pendingTranscription, pendingEmotion);

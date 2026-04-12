@@ -1,34 +1,24 @@
 using UnityEngine;
 using System.Collections.Generic;
-
-// ════════════════════════════════════════════════════════════════════════════
-//  AudioRecorder  (Singleton)
-//  Owns the microphone: start / stop recording, WAV conversion,
-//  mic enumeration & selection.
-// ════════════════════════════════════════════════════════════════════════════
+using System;
 
 public class AudioRecorder : MonoBehaviour
 {
-    // ── Singleton ──────────────────────────────────────────────────────────
     public static AudioRecorder Instance { get; private set; }
 
-    // ── Inspector ──────────────────────────────────────────────────────────
     [Header("Microphone")]
     public List<string> availableMicrophones = new List<string>();
     public int selectedMicrophoneIndex = 0;
 
-    // ── Constants ──────────────────────────────────────────────────────────
     public const int SAMPLING_RATE = 16000;
-    private const int MAX_RECORD_SECONDS = 300; // Augmenté pour permettre de longues phrases
+    private const int MAX_RECORD_SECONDS = 300; // Boucle de 5 minutes
 
-    // ── State ──────────────────────────────────────────────────────────────
     private AudioClip recording;
-    private string    deviceName;
-    public  bool      IsRecording { get; private set; }
-
-    // ════════════════════════════════════════════════════════════════════════
-    //  Lifecycle
-    // ════════════════════════════════════════════════════════════════════════
+    private string deviceName;
+    
+    // Indique si le joueur est *en train d'appuyer sur le bouton*
+    public bool IsRecording { get; private set; } 
+    private int captureStartPos = 0;
 
     void Awake()
     {
@@ -40,10 +30,6 @@ public class AudioRecorder : MonoBehaviour
     {
         RefreshMicrophones();
     }
-
-    // ════════════════════════════════════════════════════════════════════════
-    //  Microphone management
-    // ════════════════════════════════════════════════════════════════════════
 
     public void RefreshMicrophones()
     {
@@ -57,9 +43,6 @@ public class AudioRecorder : MonoBehaviour
             return;
         }
 
-        for (int i = 0; i < availableMicrophones.Count; i++)
-            Debug.Log($"<color=cyan>[MIC {i}]</color> {availableMicrophones[i]}");
-
         SelectMicrophone(selectedMicrophoneIndex);
 
         if (VRDebugPanel.instance != null)
@@ -68,33 +51,31 @@ public class AudioRecorder : MonoBehaviour
 
     public void SelectMicrophone(int index)
     {
-        if (availableMicrophones.Count == 0)
-        {
-            Debug.LogError("Aucun micro disponible.");
-            return;
-        }
+        if (availableMicrophones.Count == 0) return;
 
         selectedMicrophoneIndex = Mathf.Clamp(index, 0, availableMicrophones.Count - 1);
         deviceName = availableMicrophones[selectedMicrophoneIndex];
-        Debug.Log($"<color=green>[MIC] Sélectionné : </color>{deviceName} (index {selectedMicrophoneIndex})");
+        
+        Debug.Log($"<color=green>[MIC] Sélectionné et allumé en continu : </color>{deviceName}");
 
-        if (IsRecording)
-        {
-            Microphone.End(null);
-            IsRecording = false;
-        }
+        // On arrête l'ancien micro s'il tournait
+        Microphone.End(null);
+        
+        // On DÉMARRE LE MICRO EN CONTINU ICI (true = boucle)
+        recording = Microphone.Start(deviceName, true, MAX_RECORD_SECONDS, SAMPLING_RATE);
     }
 
     // ════════════════════════════════════════════════════════════════════════
-    //  Recording
+    //  Recording (Système de Marque-Page)
     // ════════════════════════════════════════════════════════════════════════
 
     public void StartRecording()
     {
         if (IsRecording) return;
         IsRecording = true;
-        Debug.Log("Microphone activé...");
-        recording = Microphone.Start(deviceName, false, MAX_RECORD_SECONDS, SAMPLING_RATE);
+        
+        // On place un marque page là où le joueur a commencé à parler
+        captureStartPos = Microphone.GetPosition(deviceName);
     }
     
     public byte[] StopRecording()
@@ -102,49 +83,59 @@ public class AudioRecorder : MonoBehaviour
         if (!IsRecording) return null;
         IsRecording = false;
 
-        int lastPos = Microphone.GetPosition(deviceName);
-        Microphone.End(deviceName);
+        int currentPos = Microphone.GetPosition(deviceName);
+        
+        // Calcul de la taille de l'audio
+        int length = currentPos - captureStartPos;
+        
+        // Si la boucle de 5 minutes a recommencé à zéro pendant qu'il parlait
+        if (length < 0) length += recording.samples;
 
-        if (lastPos <= 0) return null;
-        return ConvertToWav(recording, lastPos);
-    }
-    
-    public bool TryGetLiveBuffer(out AudioClip clip, out int samplesRecorded)
-    {
-        clip = recording;
-        samplesRecorded = IsRecording ? Microphone.GetPosition(deviceName) : 0;
-        return IsRecording && samplesRecorded > 0;
+        if (length <= 0) return null;
+        return GetWavChunk(captureStartPos, length);
     }
 
+    // Utilitaires pour l'Orchestrateur
+    public int GetMicPosition() => Microphone.GetPosition(deviceName);
+    public int GetClipSamples() => recording != null ? recording.samples : 0;
+
     // ════════════════════════════════════════════════════════════════════════
-    //  WAV conversion & Chunking
+    //  Extraction Sécurisée (Gère la boucle infinie)
     // ════════════════════════════════════════════════════════════════════════
 
-    /// Encode une sous-partie de l'AudioClip en WAV (Utile pour le chunking)
     public byte[] GetWavChunk(int startSample, int lengthSamples)
     {
-        if (recording == null) return null;
-
-        if (startSample < 0) startSample = 0;
-        if (lengthSamples <= 0) return null;
-        if (startSample + lengthSamples > recording.samples) 
-            lengthSamples = recording.samples - startSample;
+        if (recording == null || lengthSamples <= 0) return null;
 
         float[] samples = new float[lengthSamples * recording.channels];
-        recording.GetData(samples, startSample);
+        int clipSamples = recording.samples;
+
+        // Sécurité pour rester dans les limites
+        startSample = startSample % clipSamples;
+        if (startSample < 0) startSample += clipSamples;
+
+        // Si le morceau ne dépasse pas la fin de la boucle de 5 minutes
+        if (startSample + lengthSamples <= clipSamples)
+        {
+            recording.GetData(samples, startSample);
+        }
+        else // Cas complexe : on lit la fin de la boucle, puis on reprend au début
+        {
+            int firstPart = clipSamples - startSample;
+            int secondPart = lengthSamples - firstPart;
+
+            float[] part1 = new float[firstPart * recording.channels];
+            recording.GetData(part1, startSample);
+            Array.Copy(part1, 0, samples, 0, part1.Length);
+
+            float[] part2 = new float[secondPart * recording.channels];
+            recording.GetData(part2, 0);
+            Array.Copy(part2, 0, samples, part1.Length, part2.Length);
+        }
 
         return EncodeToWav(samples, recording.channels);
     }
 
-    /// Encode tout l'audio depuis le début
-    public static byte[] ConvertToWav(AudioClip clip, int sampleLength)
-    {
-        float[] samples = new float[sampleLength * clip.channels];
-        clip.GetData(samples, 0);
-        return EncodeToWav(samples, clip.channels);
-    }
-
-    /// Le moteur d'encodage WAV (Header 44 octets + PCM 16-bit)
     private static byte[] EncodeToWav(float[] samples, int channels)
     {
         int hz = SAMPLING_RATE;
@@ -156,7 +147,6 @@ public class AudioRecorder : MonoBehaviour
             w.Write(System.Text.Encoding.ASCII.GetBytes("RIFF"));
             w.Write(36 + count * 2);
             w.Write(System.Text.Encoding.ASCII.GetBytes("WAVE"));
-
             w.Write(System.Text.Encoding.ASCII.GetBytes("fmt "));
             w.Write(16);
             w.Write((short)1);
@@ -165,7 +155,6 @@ public class AudioRecorder : MonoBehaviour
             w.Write(hz * channels * 2);
             w.Write((short)(channels * 2));
             w.Write((short)16);
-
             w.Write(System.Text.Encoding.ASCII.GetBytes("data"));
             w.Write(count * 2);
 
