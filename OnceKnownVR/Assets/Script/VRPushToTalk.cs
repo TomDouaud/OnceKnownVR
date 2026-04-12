@@ -10,6 +10,9 @@ public class VRPushToTalk : MonoBehaviour
     [Header("Script Guide")]
     public GuideController robotController;
 
+    [Header("Artifact Scanner")]
+    public VRArtifactScanner artifactScanner;
+
     [Header("VR Input")]
     public InputActionProperty talkAction;
 
@@ -111,8 +114,11 @@ public class VRPushToTalk : MonoBehaviour
 
     private void BeginRecordingCycle()
     {
-        // Cancel any in-progress response before starting a new one
         CancelFullPipeline();
+
+        // Snapshot the artifact the visitor is pointing at right now
+        if (LLMService.Instance != null)
+            LLMService.Instance.currentArtifactId = artifactScanner != null ? artifactScanner.CurrentArtifactId : "";
 
         pendingTranscription = null;
         pendingEmotion       = null;
