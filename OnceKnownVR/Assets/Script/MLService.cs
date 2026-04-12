@@ -7,16 +7,6 @@ using System.Collections;
 //  MLService  (Singleton)
 //
 //  Emotion / ML analysis service.
-//
-//  CURRENT behaviour:
-//      Receives the FULL WAV after recording stops, sends it in one POST,
-//      parses the emotion from the JSON response, fires OnEmotionDetected.
-//
-//  FUTURE layout:
-//      ML always needs the full audio before it can analyze.  If packet-size
-//      limits appear, this service will chunk the WAV internally (split into
-//      N smaller uploads) and reassemble the result.  Callers still call
-//      Analyze(fullWav) — the chunking is transparent.
 // ════════════════════════════════════════════════════════════════════════════
 
 public enum MLAnalysisType { Audio, Text, Multimodal }
@@ -32,8 +22,10 @@ public class MLService : MonoBehaviour
     public string apiSecret = "Pure-Gallery-Silence-01-Ethereal!";
 
     // ── Events ─────────────────────────────────────────────────────────────
-    /// <summary>Fired when emotion analysis completes (success or failure).</summary>
     public event EventHandler<MLResultEventArgs> OnEmotionDetected;
+
+    // ── Internal state ─────────────────────────────────────────────────────
+    private bool _cancelled = false;
 
     // ════════════════════════════════════════════════════════════════════════
     //  Lifecycle
@@ -48,21 +40,30 @@ public class MLService : MonoBehaviour
     // ════════════════════════════════════════════════════════════════════════
     //  Public API
     // ════════════════════════════════════════════════════════════════════════
-    
-    /// Send the complete WAV for emotion analysis.
-    /// Internally may chunk the upload if the payload exceeds limits (future).
+
+    /// Abort any in-flight ML requests and suppress completion events.
+    public void Cancel()
+    {
+        _cancelled = true;
+        StopAllCoroutines();
+        Debug.Log("[ML] Cancelled.");
+    }
+
     public void AnalyzeAudio(byte[] fullWavData)
     {
+        _cancelled = false;
         StartCoroutine(PostData(MLAnalysisType.Audio, fullWavData, null));
     }
 
     public void AnalyzeText(string transcription)
     {
+        _cancelled = false;
         StartCoroutine(PostData(MLAnalysisType.Text, null, transcription));
     }
-    
+
     public void AnalyzeMultimodal(byte[] fullWavData, string transcription)
     {
+        _cancelled = false;
         StartCoroutine(PostData(MLAnalysisType.Multimodal, fullWavData, transcription));
     }
 
@@ -70,11 +71,11 @@ public class MLService : MonoBehaviour
     //  Network
     // ════════════════════════════════════════════════════════════════════════
 
-private IEnumerator PostData(MLAnalysisType type, byte[] audioData, string transcription)
+    private IEnumerator PostData(MLAnalysisType type, byte[] audioData, string transcription)
     {
         WWWForm form = new WWWForm();
 
-        if (audioData != null) form.AddBinaryData("file", audioData, "capture.wav", "audio/wav");
+        if (audioData != null)               form.AddBinaryData("file", audioData, "capture.wav", "audio/wav");
         if (!string.IsNullOrEmpty(transcription)) form.AddField("transcription", transcription);
 
         string typeName = type.ToString().ToUpper();
@@ -84,6 +85,9 @@ private IEnumerator PostData(MLAnalysisType type, byte[] audioData, string trans
         {
             request.SetRequestHeader("x-vr-app-secret", apiSecret);
             yield return request.SendWebRequest();
+
+            // Discard result if cancelled while the request was in-flight
+            if (_cancelled) yield break;
 
             if (request.result != UnityWebRequest.Result.Success)
             {
@@ -98,13 +102,12 @@ private IEnumerator PostData(MLAnalysisType type, byte[] audioData, string trans
                 if (result != null && result.status == "success")
                 {
                     string emotionFull = GetFullEmotionName(result.final_decision);
-                    string colour = GetColorForEmotion(emotionFull);
+                    string colour      = GetColorForEmotion(emotionFull);
 
                     Debug.Log($"<color={colour}>[ML AGENT - {typeName}] Émotion : {emotionFull.ToUpper()}</color>");
-                    
-                    if (type == MLAnalysisType.Multimodal) {
+
+                    if (type == MLAnalysisType.Multimodal)
                         Debug.Log($"<color=grey>Détails -> Voix: {GetFullEmotionName(result.audio_detected)} | Texte: {GetFullEmotionName(result.text_detected)}</color>");
-                    }
 
                     OnEmotionDetected?.Invoke(this, new MLResultEventArgs(emotionFull, jsonResponse, true));
                 }
@@ -123,7 +126,6 @@ private IEnumerator PostData(MLAnalysisType type, byte[] audioData, string trans
     public static string GetFullEmotionName(string shortEmotion)
     {
         if (string.IsNullOrEmpty(shortEmotion)) return "Inconnu";
-
         switch (shortEmotion.ToLower())
         {
             case "neu": return "Neutral";

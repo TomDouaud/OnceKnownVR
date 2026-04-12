@@ -30,11 +30,23 @@ public class LLMTestPanel : MonoBehaviour
             return;
         }
 
-        string filler = FillerBank.Pick();
-        Debug.Log($"<color=orange>[LLMTest] Sending: \"{prompt}\" | Filler: \"{filler}\"</color>");
+        // Cancel any in-progress response before sending a new one
+        CancelFullPipeline();
+
+        //string filler = FillerBank.Pick();
+        Debug.Log($"<color=orange>[LLMTest] Sending: \"{prompt}\"");
 
         TTSService.Instance.BeginSession();
-        TTSService.Instance.FeedToken(filler);
-        LLMService.Instance.Send(prompt, "Neutral", filler);
+        //TTSService.Instance.FeedToken(filler);
+        LLMService.Instance.Send(prompt, "Neutral");
+    }
+
+    private void CancelFullPipeline()
+    {
+        if (STTService.Instance  != null) STTService.Instance.Cancel();
+        if (MLService.Instance   != null) MLService.Instance.Cancel();
+        if (LLMService.Instance  != null) LLMService.Instance.Cancel();
+        if (TTSService.Instance  != null) TTSService.Instance.Cancel();
+        Debug.Log("<color=red>[LLMTest] Pipeline cancelled before new send.</color>");
     }
 }

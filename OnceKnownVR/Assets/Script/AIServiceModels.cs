@@ -8,14 +8,23 @@ using UnityEngine.Serialization;
 
 // ── REQUEST / RESPONSE DTOs ────────────────────────────────────────────────
 
+/// One turn in the conversation history sent to the LLM.
+[Serializable]
+public class HistoryMessage
+{
+    public string role;     // "user" or "assistant"
+    public string content;
+}
+
 [Serializable]
 public class LlmRequest
 {
-    public string prompt;
-    public string emotion;
-    public string artifactId;
-    public bool   stream;
-    public string responsePrefix; 
+    public string               prompt;
+    public string               emotion;
+    public string               artifactId;
+    public bool                 stream;
+    public string               responsePrefix;
+    public List<HistoryMessage> history;
 }
 
 [Serializable]

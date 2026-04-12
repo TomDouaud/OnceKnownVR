@@ -1479,6 +1479,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 035131348fbb0704cb4044ecf948ff6f, type: 3}
   m_Name: 
   m_EditorClassIdentifier: '::'
+  robotController: {fileID: 0}
   talkAction:
     m_UseReference: 0
     m_Action:
