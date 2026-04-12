@@ -2,6 +2,7 @@ using UnityEngine;
 using UnityEngine.Networking;
 using System;
 using System.Collections;
+using System.Text.RegularExpressions;
 
 public class STTService : MonoBehaviour
 {
@@ -88,32 +89,82 @@ public class STTService : MonoBehaviour
             request.SetRequestHeader("x-vr-app-secret", apiSecret);
             yield return request.SendWebRequest();
 
-            // Discard result if cancelled while the request was in-flight
-            if (_cancelled) yield break;
-
             if (request.result == UnityWebRequest.Result.Success)
             {
-                string partialText = request.downloadHandler.text;
+                string partialText = request.downloadHandler.text.Trim();
+                string lowerText = partialText.ToLower();
+                
+                // ─── FILTRE ANTI-HALLUCINATIONS AMÉLIORÉ ───
+                bool isHallucination = false;
 
-                if (!string.IsNullOrEmpty(assembledText) && !string.IsNullOrEmpty(partialText))
-                    assembledText += " ";
+                // A. On supprime tout ce qui est entre crochets [ ]
+                // Exemple : "[Musique] Bonjour" devient " Bonjour"
+                string textWithoutBrackets = Regex.Replace(lowerText, @"\[.*?\]", "").Trim();
 
-                assembledText += partialText;
+                // B. On nettoie les caractères parasites (points, guillemets)
+                string cleanCheck = textWithoutBrackets.Replace(".", "").Replace("\"", "").Trim();
 
-                Debug.Log($"<color=cyan>[STT Chunk] </color>{partialText}");
-                OnChunkResult?.Invoke(this, new STTChunkEventArgs(partialText, isFinal));
+                // C. Si après nettoyage il ne reste rien, c'est une hallucination
+                if (string.IsNullOrEmpty(cleanCheck))
+                {
+                    isHallucination = true;
+                }
+                else
+                {
+                    // D. Liste des phrases bannies classiques
+                    string[] banni = { 
+                        "amara.org", "sous-titre", "bruit de fond", "silence", 
+                        "non audible", "inaudible" 
+                    };
+
+                    foreach (string mot in banni)
+                    {
+                        if (lowerText.Contains(mot))
+                        {
+                            isHallucination = true;
+                            break;
+                        }
+                    }
+                }
+
+                if (isHallucination)
+                {
+                    Debug.Log($"<color=orange>[STT] Hallucination détectée et bloquée : {partialText}</color>");
+                    partialText = ""; 
+                }
+
+                // ─── ASSEMBLAGE DU TEXTE VALIDE ───
+                if (!string.IsNullOrEmpty(partialText))
+                {
+                    // Si on veut garder le texte mais enlever les crochets pour le LLM, 
+                    // on peut utiliser 'textWithoutBrackets' au lieu de 'partialText' ici.
+                    if (!string.IsNullOrEmpty(assembledText))
+                        assembledText += " ";
+                        
+                    assembledText += partialText;
+                    
+                    Debug.Log($"<color=cyan>[STT Chunk] </color>{partialText}");
+                    OnChunkResult?.Invoke(this, new STTChunkEventArgs(partialText, isFinal));
+                }
 
                 if (isFinal)
                 {
-                    Debug.Log($"<color=green>[STT Complet] </color>{assembledText}");
-                    OnTranscriptionComplete?.Invoke(this, new STTChunkEventArgs(assembledText, true));
+                    if (!string.IsNullOrEmpty(assembledText))
+                    {
+                        Debug.Log($"<color=green>[STT Complet] </color>{assembledText}");
+                        OnTranscriptionComplete?.Invoke(this, new STTChunkEventArgs(assembledText, true));
+                    }
+                    else
+                    {
+                        Debug.Log("<color=grey>[STT] Aucun contenu vocal valide détecté.</color>");
+                        OnTranscriptionComplete?.Invoke(this, new STTChunkEventArgs("", true));
+                    }
                 }
             }
             else
             {
                 Debug.LogError($"Erreur STT (Chunk) : {request.error}");
-                if (isFinal)
-                    OnTranscriptionComplete?.Invoke(this, new STTChunkEventArgs(assembledText, true));
+                if (isFinal) OnTranscriptionComplete?.Invoke(this, new STTChunkEventArgs(assembledText, true));
             }
         }
     }
