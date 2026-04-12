@@ -111,10 +111,9 @@ public class STTService : MonoBehaviour
                 }
                 else
                 {
-                    // D. Liste des phrases bannies classiques
+                    // D. VIDER SI BESOIN : Liste de mots ou expressions spécifiques à bloquer ( bloc le texte entier si l'un d'eux est détecté )
                     string[] banni = { 
-                        "amara.org", "sous-titre", "bruit de fond", "silence", 
-                        "non audible", "inaudible" 
+                        
                     };
 
                     foreach (string mot in banni)
