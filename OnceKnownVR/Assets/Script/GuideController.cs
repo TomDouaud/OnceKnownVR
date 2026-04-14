@@ -44,18 +44,11 @@ public class GuideController : MonoBehaviour
         if (e.CurrentPhase == TTSEventArgs.Phase.Complete)
         {
             Debug.Log("TTS has finished speaking the entire sequence!");
-            ChangeState((int)GuideState.Wandering);
             ChangeLockState(false);
-        }
-
-        if (e.CurrentPhase == TTSEventArgs.Phase.ChunkReady)
-        {
-            ChangeState((int)GuideState.Following);
-            ChangeLockState(true);
         }
     }
 
-    private void ChangeLockState(bool lockState)
+    public void ChangeLockState(bool lockState)
     {
         bLockState  = lockState;
     }

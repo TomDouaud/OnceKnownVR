@@ -37,8 +37,7 @@ public class VRPushToTalk : MonoBehaviour
         if (talkAction.action != null)
         {
             talkAction.action.Enable();
-            if (robotController != null)
-                robotController.ChangeState(2);
+            
         }
 
         if (STTService.Instance != null)
@@ -81,6 +80,12 @@ public class VRPushToTalk : MonoBehaviour
         if (triggerValue > 0.5f && !AudioRecorder.Instance.IsRecording)
         {
             Debug.Log("Recording...");
+            if (robotController != null)
+            {
+                robotController.ChangeState(2);
+                robotController.ChangeLockState(true);
+            }
+                
             BeginRecordingCycle();
         }
         else if (triggerValue < 0.5f && AudioRecorder.Instance.IsRecording)
