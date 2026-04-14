@@ -32,7 +32,7 @@ public class LLMService : MonoBehaviour
 
     // ── History settings ───────────────────────────────────────────────────
     private const int MAX_HISTORY_TURNS = 30;
-    private const int MAX_HISTORY_CHARS = 100000;
+    private const int MAX_HISTORY_CHARS = 8000;
 
     // ── Events ─────────────────────────────────────────────────────────────
     /// <summary>Fired for each streamed token.</summary>
