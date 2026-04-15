@@ -11,7 +11,7 @@ public static class FillerBank
 {
     private static readonly List<string> Phrases = new List<string>
     {
-        "Hmm, laissez-moi réfléchir un instant.",
+        "Ah, laissez-moi réfléchir un instant.",
         "Bonne question, je cherche dans ma mémoire.",
         "Un moment, je rassemble mes idées.",
         "Voyons voir, laissez-moi y penser.",
