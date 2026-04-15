@@ -21,6 +21,7 @@ public class VRPushToTalk : MonoBehaviour
     private string pendingEmotion       = null;
     private bool   llmAlreadySent       = false;
     private byte[] currentWavData       = null;
+    private string snapshotArtifactId   = "";
 
     // ── Chunking State ─────────────────────────────────────────────────────
     private Coroutine chunkRoutine;
@@ -121,8 +122,7 @@ public class VRPushToTalk : MonoBehaviour
         CancelFullPipeline();
 
         // Snapshot the artifact the visitor is pointing at right now
-        if (LLMService.Instance != null)
-            LLMService.Instance.currentArtifactId = artifactScanner != null ? artifactScanner.CurrentArtifactId : "";
+        snapshotArtifactId = (artifactScanner != null) ? artifactScanner.CurrentArtifactId : "";
 
         pendingTranscription = null;
         pendingEmotion       = null;
@@ -168,6 +168,12 @@ public class VRPushToTalk : MonoBehaviour
 
         // On récupère le bloc d'audio total (depuis l'appui sur le bouton) pour le ML
         currentWavData = AudioRecorder.Instance.StopRecording();
+        
+        if (TTSService.Instance != null)
+        {
+            TTSService.Instance.BeginSession();
+            TTSService.Instance.FeedToken(FillerBank.Pick());
+        }
     }
 
     private System.Collections.IEnumerator ProcessChunksRoutine()
@@ -251,11 +257,7 @@ public class VRPushToTalk : MonoBehaviour
             Debug.Log($"<color=yellow>[COLLECTOR] Both ready — STT: \"{pendingTranscription}\" " +
                       $"| Emotion: {pendingEmotion}");
 
-            if (TTSService.Instance != null)
-            {
-                TTSService.Instance.BeginSession();
-            }
-
+            LLMService.Instance.currentArtifactId = snapshotArtifactId;
             LLMService.Instance.Send(pendingTranscription, pendingEmotion);
         }
     }
