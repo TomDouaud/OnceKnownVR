@@ -4,14 +4,18 @@ using UnityEngine.AI;
 [RequireComponent(typeof(NavMeshAgent), typeof(Animator))]
 public class GuideController : MonoBehaviour
 {
-    public enum GuideState { Wandering = 1, Following = 2}
+    public enum GuideState
+    {
+        Wandering = 1,
+        Following = 2
+    }
+
     public GuideState currentState = GuideState.Following;
 
-    [Header("References")]
-    public Transform player;
+    [Header("References")] public Transform player;
     public float wanderRadius = 15f; // Rayon de recherche du point
-    public float wanderTimer = 5f;   // Temps avant de changer de point
-    
+    public float wanderTimer = 5f; // Temps avant de changer de point
+
     private NavMeshAgent agent;
     private Animator animator;
     private float timer;
@@ -22,12 +26,13 @@ public class GuideController : MonoBehaviour
         agent = GetComponent<NavMeshAgent>();
         animator = GetComponent<Animator>();
         timer = wanderTimer;
-        
+
     }
+
     void OnEnable()
     {
         // Subscribe to the event
-        if(TTSService.Instance  != null)
+        if (TTSService.Instance != null)
             TTSService.Instance.OnTTSEvent += HandleTTSEvent;
     }
 
@@ -40,7 +45,11 @@ public class GuideController : MonoBehaviour
 
     private void HandleTTSEvent(object sender, TTSEventArgs e)
     {
-        // Check if the phase is "Complete"
+        if (e.CurrentPhase == TTSEventArgs.Phase.ChunkReady)
+        {
+            SetThinking(false);
+        }
+
         if (e.CurrentPhase == TTSEventArgs.Phase.Complete)
         {
             Debug.Log("TTS has finished speaking the entire sequence!");
@@ -48,11 +57,24 @@ public class GuideController : MonoBehaviour
         }
     }
 
+    public void SetThinking(bool thinking)
+    {
+        if (animator != null)
+        {
+            animator.SetBool("isThinking", thinking);
+        }
+    }
+
+    public void PlayGoodbyeAnimation()
+    {
+        animator.SetTrigger("Goodbye");
+    }
+
     public void ChangeLockState(bool lockState)
     {
-        bLockState  = lockState;
+        bLockState = lockState;
     }
-    
+
     void Update()
     {
         switch (currentState)
@@ -64,7 +86,7 @@ public class GuideController : MonoBehaviour
                 WanderAround();
                 break;
         }
-        
+
         animator.SetFloat("Speed", agent.velocity.magnitude);
     }
 
@@ -73,13 +95,13 @@ public class GuideController : MonoBehaviour
         if (player != null)
         {
             agent.SetDestination(player.position);
-            agent.stoppingDistance = 2.0f; 
+            agent.stoppingDistance = 2.0f;
         }
     }
 
     private void WanderAround()
     {
-        
+
         timer += Time.deltaTime;
 
         if (timer >= wanderTimer)
@@ -89,7 +111,7 @@ public class GuideController : MonoBehaviour
             timer = 0;
         }
     }
-    
+
     // Fonction pour trouver une position aléatoire sur le NavMesh
     public Vector3 RandomNavMeshLocation(float radius)
     {
@@ -99,7 +121,7 @@ public class GuideController : MonoBehaviour
         NavMesh.SamplePosition(randomDirection, out hit, radius, 1);
         return hit.position;
     }
-    
+
     // Fonction appelée par l'Animation Event de Walk_N
     public void OnFootstep(AnimationEvent animationEvent)
     {
@@ -108,10 +130,12 @@ public class GuideController : MonoBehaviour
 
     public void ChangeState(int newState)
     {
+        animator.SetTrigger("Goodbye");
+        Debug.Log("Lancement de l'anim Goodbye via ChangeState");
+
         if (!bLockState)
         {
-            currentState = (GuideState)newState;    
+            currentState = (GuideState)newState;
         }
-        
     }
 }
