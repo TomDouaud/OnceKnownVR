@@ -9,6 +9,7 @@ public class VRPushToTalk : MonoBehaviour
 {
     [Header("Script Guide")]
     public GuideController robotController;
+    public ThinkingBubble thinkingBubble;
 
     [Header("Artifact Scanner")]
     public VRArtifactScanner artifactScanner;
@@ -111,6 +112,8 @@ public class VRPushToTalk : MonoBehaviour
         if (LLMService.Instance  != null) LLMService.Instance.Cancel();
         if (TTSService.Instance  != null) TTSService.Instance.Cancel();
         Debug.Log("<color=red>[Orchestrator] Pipeline cancelled.</color>");
+
+        thinkingBubble.StopThinking();
     }
 
     // ════════════════════════════════════════════════════════════════════════
@@ -173,6 +176,7 @@ public class VRPushToTalk : MonoBehaviour
         {
             TTSService.Instance.BeginSession();
             TTSService.Instance.FeedToken(FillerBank.Pick());
+            thinkingBubble.StartThinking();
         }
     }
 

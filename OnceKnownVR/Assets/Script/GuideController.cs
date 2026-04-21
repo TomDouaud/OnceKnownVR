@@ -4,6 +4,8 @@ using UnityEngine.AI;
 [RequireComponent(typeof(NavMeshAgent), typeof(Animator))]
 public class GuideController : MonoBehaviour
 {
+    public ThinkingBubble thinkingBubble;
+
     public enum GuideState { Wandering = 1, Following = 2}
     public GuideState currentState = GuideState.Following;
 
@@ -29,6 +31,9 @@ public class GuideController : MonoBehaviour
         // Subscribe to the event
         if(TTSService.Instance  != null)
             TTSService.Instance.OnTTSEvent += HandleTTSEvent;
+
+        if (LLMService.Instance != null)
+            LLMService.Instance.OnResponseComplete += HandleLLMResponseComplete;
     }
 
     void OnDisable()
@@ -36,6 +41,9 @@ public class GuideController : MonoBehaviour
         // Unsubscribe to avoid memory leaks
         if (TTSService.Instance != null)
             TTSService.Instance.OnTTSEvent -= HandleTTSEvent;
+
+        if (LLMService.Instance != null)
+            LLMService.Instance.OnResponseComplete -= HandleLLMResponseComplete;
     }
 
     private void HandleTTSEvent(object sender, TTSEventArgs e)
@@ -44,13 +52,7 @@ public class GuideController : MonoBehaviour
         if (e.CurrentPhase == TTSEventArgs.Phase.Complete)
         {
             Debug.Log("TTS has finished speaking the entire sequence!");
-            GetComponentInChildren<ThinkingBubble>().StopThinking();
             ChangeLockState(false);
-        }
-
-        if (e.CurrentPhase == TTSEventArgs.Phase.Started)
-        {
-            GetComponentInChildren<ThinkingBubble>().StartThinking();
         }
     }
 
@@ -110,6 +112,27 @@ public class GuideController : MonoBehaviour
     public void OnFootstep(AnimationEvent animationEvent)
     {
         // TODO add sfx
+    }
+
+    private void HandleLLMResponseComplete(object sender, LLMCompleteEventArgs e)
+    {
+        // Si la réponse est un succès, on arrête de réfléchir et on commence à parler
+        if (e.Success)
+        {
+            Debug.Log("LLM a répondu, le guide peut parler.");
+            StartTalk();
+        }
+        else
+        {
+            // Optionnel : Gérer l'erreur (ex: cacher la bulle quand même)
+            thinkingBubble.StopThinking();
+            Debug.LogError("Erreur LLM : " + e.Error);
+        }
+    }
+
+    public void StartTalk()
+    {
+        thinkingBubble.StopThinking();
     }
 
     public void ChangeState(int newState)
