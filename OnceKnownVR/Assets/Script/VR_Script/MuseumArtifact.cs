@@ -1,43 +1,71 @@
 using UnityEngine;
+using System.Collections.Generic;
 
 public class MuseumArtifact : MonoBehaviour
 {
-    [Header("Identifiants pour le LLM")]
-    [Tooltip("L'ID exact que l'IA Python/Node va reconnaître (ex: vase_ming, joconde)")]
+    [Header("Identifiants")]
     public string artifactId;
-    
-    [Tooltip("Le nom affiché (pour le debug ou une future UI)")]
     public string artifactName;
 
-    [Header("Feedback Visuel")]
+    [Header("Réglages du Glow")]
     public bool enableHighlight = true;
-    
-    private Renderer meshRenderer;
-    private Color originalColor;
+    public Color glowColor = Color.white;
+    [Range(0f, 5f)] public float intensity = 0.1f; // Réglé à 1.2 pour ne pas tout "brûler"
+
+    private MeshRenderer[] allRenderers;
+    private Dictionary<Material, Color> originalEmissionColors = new Dictionary<Material, Color>();
 
     void Start()
     {
-        meshRenderer = GetComponent<Renderer>();
-        if (meshRenderer != null)
+        allRenderers = GetComponentsInChildren<MeshRenderer>();
+        // On pré-cache les matériaux et leurs émissions
+        foreach (MeshRenderer ren in allRenderers)
         {
-            originalColor = meshRenderer.material.color;
+            foreach (Material mat in ren.materials)
+            {
+                if (mat.HasProperty("_EmissionColor"))
+                {
+                    originalEmissionColors[mat] = mat.GetColor("_EmissionColor");
+                }
+            }
         }
     }
-    
+
     public void OnHoverStart()
     {
-        if (enableHighlight && meshRenderer != null)
+        if (!enableHighlight) return;
+
+        foreach (MeshRenderer ren in allRenderers)
         {
-            // On teinte légèrement l'œuvre pour montrer qu'elle est sélectionnée
-            meshRenderer.material.color = Color.Lerp(originalColor, Color.yellow, 0.3f);
+            foreach (Material mat in ren.materials)
+            {
+                mat.EnableKeyword("_EMISSION");
+
+                // On crée un blanc doux. 
+                // Pour l'opacité 50%, on réduit l'intensité au lieu de l'alpha 
+                // car l'émission est additive sur le shader standard.
+                Color finalGlow = glowColor * intensity * 0.5f;
+
+                mat.SetColor("_EmissionColor", finalGlow);
+            }
         }
     }
-    
+
     public void OnHoverEnd()
     {
-        if (enableHighlight && meshRenderer != null)
+        foreach (MeshRenderer ren in allRenderers)
         {
-            meshRenderer.material.color = originalColor;
+            foreach (Material mat in ren.materials)
+            {
+                if (originalEmissionColors.ContainsKey(mat))
+                {
+                    mat.SetColor("_EmissionColor", originalEmissionColors[mat]);
+                }
+                else
+                {
+                    mat.DisableKeyword("_EMISSION");
+                }
+            }
         }
     }
 }

@@ -423,8 +423,6 @@ MonoBehaviour:
   artifactId: Pistolet_a_Silex
   artifactName: Pistoler a Silex
   enableHighlight: 1
-  glowColor: {r: 1, g: 1, b: 1, a: 1}
-  intensity: 0.1
 --- !u!4 &36103087 stripped
 Transform:
   m_CorrespondingSourceObject: {fileID: -8679921383154817045, guid: 0d6aadc7aba52974eb05d3327480b55d, type: 3}
@@ -700,8 +698,6 @@ MonoBehaviour:
   artifactId: judith_et_holopherne
   artifactName: Judith et Holopherne
   enableHighlight: 1
-  glowColor: {r: 1, g: 1, b: 1, a: 1}
-  intensity: 0.1
 --- !u!1001 &55776151
 PrefabInstance:
   m_ObjectHideFlags: 0
@@ -1291,8 +1287,6 @@ MonoBehaviour:
   artifactId: Buste_Robert_Bruce_Cotton
   artifactName: Buste de Sir Robert Bruce Cotton
   enableHighlight: 1
-  glowColor: {r: 1, g: 1, b: 1, a: 1}
-  intensity: 0.1
 --- !u!4 &116605828 stripped
 Transform:
   m_CorrespondingSourceObject: {fileID: -8679921383154817045, guid: 56dd07815c69af9499633ee0c51579f6, type: 3}
@@ -2211,8 +2205,6 @@ MonoBehaviour:
   artifactId: Philippe IV
   artifactName: Philippe IV en costume de chasseur
   enableHighlight: 1
-  glowColor: {r: 1, g: 1, b: 1, a: 1}
-  intensity: 0.1
 --- !u!1001 &201903218
 PrefabInstance:
   m_ObjectHideFlags: 0
@@ -2528,8 +2520,6 @@ MonoBehaviour:
   artifactId: Chute_Icare
   artifactName: La Chute d'Icare
   enableHighlight: 1
-  glowColor: {r: 1, g: 1, b: 1, a: 1}
-  intensity: 0.1
 --- !u!1001 &272169159
 PrefabInstance:
   m_ObjectHideFlags: 0
@@ -3583,8 +3573,6 @@ MonoBehaviour:
   artifactId: Casque_Joute
   artifactName: Casque de Joute
   enableHighlight: 1
-  glowColor: {r: 1, g: 1, b: 1, a: 1}
-  intensity: 0.1
 --- !u!4 &336622810 stripped
 Transform:
   m_CorrespondingSourceObject: {fileID: -8679921383154817045, guid: b3f45c2f3be21064295f6788d0d9521e, type: 3}
@@ -3904,8 +3892,6 @@ MonoBehaviour:
   artifactId: Massacre
   artifactName: Le Massacre des Innocents
   enableHighlight: 1
-  glowColor: {r: 1, g: 1, b: 1, a: 1}
-  intensity: 0.1
 --- !u!4 &390395998 stripped
 Transform:
   m_CorrespondingSourceObject: {fileID: 2968750529479920327, guid: 2eabee1403c49484c8898cd21f662da8, type: 3}
@@ -4675,8 +4661,6 @@ MonoBehaviour:
   artifactId: Les Quatres Ages
   artifactName: Les Quatres ages de l'homme
   enableHighlight: 1
-  glowColor: {r: 1, g: 1, b: 1, a: 1}
-  intensity: 0.1
 --- !u!1001 &520853075
 PrefabInstance:
   m_ObjectHideFlags: 0
@@ -4802,8 +4786,6 @@ MonoBehaviour:
   artifactId: Casque_Viseur_Grotesque
   artifactName: Casque au Viseur Grotesque
   enableHighlight: 1
-  glowColor: {r: 1, g: 1, b: 1, a: 1}
-  intensity: 0.1
 --- !u!4 &520853078 stripped
 Transform:
   m_CorrespondingSourceObject: {fileID: -8679921383154817045, guid: 83fb455c82f667a42b8e42660bf5f8a8, type: 3}
@@ -6166,8 +6148,6 @@ MonoBehaviour:
   artifactId: Tankard_reine_saba_roi_salomon
   artifactName: Tankard Reine Saba et Roi Salomon
   enableHighlight: 1
-  glowColor: {r: 1, g: 1, b: 1, a: 1}
-  intensity: 0.1
 --- !u!4 &653071819 stripped
 Transform:
   m_CorrespondingSourceObject: {fileID: -8679921383154817045, guid: 47c85ebaf1cb3da4c95707f3fd8f30ba, type: 3}
@@ -6516,8 +6496,6 @@ MonoBehaviour:
   artifactId: casque_queue_homard
   artifactName: Pappenheimer helmet
   enableHighlight: 1
-  glowColor: {r: 1, g: 1, b: 1, a: 1}
-  intensity: 0.1
 --- !u!114 &660806455
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -7533,10 +7511,6 @@ PrefabInstance:
       propertyPath: m_LocalPosition.x
       value: -0.0517
       objectReference: {fileID: 0}
-    - target: {fileID: 2938657243934324338, guid: 94eea56c88966c3499c996801774c128, type: 3}
-      propertyPath: thinkingBubble
-      value: 
-      objectReference: {fileID: 1472918590}
     - target: {fileID: 2938657243934324338, guid: 94eea56c88966c3499c996801774c128, type: 3}
       propertyPath: artifactScanner
       value: 
@@ -9179,8 +9153,6 @@ MonoBehaviour:
   artifactId: Chat
   artifactName: Nature morte au chat
   enableHighlight: 1
-  glowColor: {r: 1, g: 1, b: 1, a: 1}
-  intensity: 0.1
 --- !u!1001 &895563387
 PrefabInstance:
   m_ObjectHideFlags: 0
@@ -9537,8 +9509,6 @@ MonoBehaviour:
   artifactId: Moise
   artifactName: Moise sortant l'eau du rocher
   enableHighlight: 1
-  glowColor: {r: 1, g: 1, b: 1, a: 1}
-  intensity: 0.1
 --- !u!1001 &947713185
 PrefabInstance:
   m_ObjectHideFlags: 0
@@ -9851,8 +9821,6 @@ MonoBehaviour:
   artifactId: Les_Menines
   artifactName: "Les M\xE9nines"
   enableHighlight: 1
-  glowColor: {r: 1, g: 1, b: 1, a: 1}
-  intensity: 0.1
 --- !u!1001 &995695994
 PrefabInstance:
   m_ObjectHideFlags: 0
@@ -10717,8 +10685,6 @@ MonoBehaviour:
   artifactId: Cochon
   artifactName: "Le Toit \xE0 porcs"
   enableHighlight: 1
-  glowColor: {r: 1, g: 1, b: 1, a: 1}
-  intensity: 0.1
 --- !u!1001 &1218548035
 PrefabInstance:
   m_ObjectHideFlags: 0
@@ -10848,8 +10814,6 @@ MonoBehaviour:
   artifactId: plaquettes_cuirasse_hussar
   artifactName: Plaque pectorale provenant de la cuirasse d'un hussard
   enableHighlight: 1
-  glowColor: {r: 1, g: 1, b: 1, a: 1}
-  intensity: 0.1
 --- !u!4 &1218548038 stripped
 Transform:
   m_CorrespondingSourceObject: {fileID: -8679921383154817045, guid: cda92672b4b3baa4d9cbf2c460c35c22, type: 3}
@@ -11223,8 +11187,6 @@ MonoBehaviour:
   artifactId: Dutch_Transitional_Rapier
   artifactName: "Rapi\xE8re n\xE9erlandaise"
   enableHighlight: 1
-  glowColor: {r: 1, g: 1, b: 1, a: 1}
-  intensity: 0.1
 --- !u!4 &1223985094 stripped
 Transform:
   m_CorrespondingSourceObject: {fileID: -8679921383154817045, guid: 0ad5532dfb09fdb48b9eddce49280fae, type: 3}
@@ -11734,8 +11696,6 @@ MonoBehaviour:
   artifactId: Amour_Sacre_Amour_Profane
   artifactName: "Amour sacr\xE9 et Amour profane"
   enableHighlight: 1
-  glowColor: {r: 1, g: 1, b: 1, a: 1}
-  intensity: 0.1
 --- !u!1001 &1268128905
 PrefabInstance:
   m_ObjectHideFlags: 0
@@ -12404,8 +12364,6 @@ MonoBehaviour:
   artifactName: "Portrait d'un gentilhomme \xE0 cheval avec carrosse devant une porte
     monumentale"
   enableHighlight: 1
-  glowColor: {r: 1, g: 1, b: 1, a: 1}
-  intensity: 0.1
 --- !u!1001 &1394473478
 PrefabInstance:
   m_ObjectHideFlags: 0
@@ -14191,8 +14149,6 @@ MonoBehaviour:
   artifactId: Assiete_Griffon
   artifactName: "Assiette avec un griffon ail\xE9"
   enableHighlight: 1
-  glowColor: {r: 1, g: 1, b: 1, a: 1}
-  intensity: 0.1
 --- !u!4 &1779955440 stripped
 Transform:
   m_CorrespondingSourceObject: {fileID: -8679921383154817045, guid: 22369a1141ea66f43b7564432b729d2e, type: 3}
@@ -15182,7 +15138,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 2aff3eb57c3dd6d48a6cc82c6768fbdb, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::GuideController
-  thinkingBubble: {fileID: 1472918590}
+  thinkingBubble: {fileID: 0}
   currentState: 1
   player: {fileID: 986378351}
   wanderRadius: 10
@@ -15595,8 +15551,6 @@ MonoBehaviour:
   artifactId: Ulysse
   artifactName: "Ulysse remet Chrys\xE9is \xE0 son pere"
   enableHighlight: 1
-  glowColor: {r: 1, g: 1, b: 1, a: 1}
-  intensity: 0.1
 --- !u!1001 &1962893327
 PrefabInstance:
   m_ObjectHideFlags: 0
@@ -16134,8 +16088,6 @@ MonoBehaviour:
   artifactName: "Poup\xE9e \xE0 m\xE9canisme articul\xE9 un homme assis sur un lion
     gardien imp\xE9rial"
   enableHighlight: 1
-  glowColor: {r: 1, g: 1, b: 1, a: 1}
-  intensity: 0.1
 --- !u!65 &2035152404
 BoxCollider:
   m_ObjectHideFlags: 0
@@ -16329,8 +16281,6 @@ MonoBehaviour:
   artifactName: "Poup\xE9e \xE0 m\xE9canisme articul\xE9 un homme assis sur un lion
     gardien imp\xE9rial"
   enableHighlight: 1
-  glowColor: {r: 1, g: 1, b: 1, a: 1}
-  intensity: 0.1
 --- !u!224 &2045275158 stripped
 RectTransform:
   m_CorrespondingSourceObject: {fileID: 7430250274365158998, guid: 88bf175f36a916444986dbdcb353d0c0, type: 3}
@@ -16902,8 +16852,6 @@ MonoBehaviour:
   artifactId: La_Ronde_De_Nuit
   artifactName: La ronde de nuit
   enableHighlight: 1
-  glowColor: {r: 1, g: 1, b: 1, a: 1}
-  intensity: 0.1
 --- !u!1 &2093402293 stripped
 GameObject:
   m_CorrespondingSourceObject: {fileID: 4420198914148047498, guid: 94eea56c88966c3499c996801774c128, type: 3}
@@ -17369,8 +17317,6 @@ MonoBehaviour:
   artifactId: Ecole_Athenes
   artifactName: "L'\xC9cole d'Ath\xE8nes"
   enableHighlight: 1
-  glowColor: {r: 1, g: 1, b: 1, a: 1}
-  intensity: 0.1
 --- !u!1001 &848183080645961434
 PrefabInstance:
   m_ObjectHideFlags: 0
@@ -17472,8 +17418,6 @@ MonoBehaviour:
   artifactId: NouveauNe
   artifactName: NouveauNe
   enableHighlight: 1
-  glowColor: {r: 1, g: 1, b: 1, a: 1}
-  intensity: 0.1
 --- !u!4 &1017021126567497162 stripped
 Transform:
   m_CorrespondingSourceObject: {fileID: 1017021127947506720, guid: b942038a417146d419ca91faa6ad1422, type: 3}
@@ -17905,8 +17849,6 @@ MonoBehaviour:
   artifactId: Sunrise
   artifactName: Sunrise
   enableHighlight: 1
-  glowColor: {r: 1, g: 1, b: 1, a: 1}
-  intensity: 0.1
 --- !u!33 &5041725433713126591
 MeshFilter:
   m_ObjectHideFlags: 0

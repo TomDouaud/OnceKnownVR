@@ -177,6 +177,7 @@ public class VRPushToTalk : MonoBehaviour
             TTSService.Instance.BeginSession();
             TTSService.Instance.FeedToken(FillerBank.Pick());
             thinkingBubble.StartThinking();
+            robotController.SetThinking(true);
         }
     }
 

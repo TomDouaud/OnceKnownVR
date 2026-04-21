@@ -92,9 +92,6 @@ public class LLMService : MonoBehaviour
             return;
         }
         
-        var guide = FindObjectOfType<GuideController>();
-        if (guide != null) guide.SetThinking(true);
-        
         StartCoroutine(StreamRequest(transcription, emotion, responsePrefix));
     }
 

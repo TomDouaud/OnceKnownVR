@@ -48,11 +48,6 @@ public class GuideController : MonoBehaviour
 
     private void HandleTTSEvent(object sender, TTSEventArgs e)
     {
-        if (e.CurrentPhase == TTSEventArgs.Phase.ChunkReady)
-        {
-            SetThinking(false);
-        }
-
         if (e.CurrentPhase == TTSEventArgs.Phase.Complete)
         {
             Debug.Log("TTS has finished speaking the entire sequence!");
@@ -70,7 +65,10 @@ public class GuideController : MonoBehaviour
 
     public void PlayGoodbyeAnimation()
     {
-        animator.SetTrigger("Goodbye");
+        if (animator != null)
+        {
+            animator.SetTrigger("Goodbye");
+        }
     }
 
     public void ChangeLockState(bool lockState)
@@ -150,15 +148,19 @@ public class GuideController : MonoBehaviour
     public void StartTalk()
     {
         thinkingBubble.StopThinking();
+        SetThinking(false);
     }
 
     public void ChangeState(int newState)
     {
-        animator.SetTrigger("Goodbye");
         Debug.Log("Lancement de l'anim Goodbye via ChangeState");
 
         if (!bLockState)
         {
+            if (newState == 1 && currentState != (GuideState)newState)
+            {
+                PlayGoodbyeAnimation();
+            }
             currentState = (GuideState)newState;
         }
     }
