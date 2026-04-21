@@ -1,7 +1,7 @@
 using UnityEngine;
 using UnityEngine.Events;
 
-public class trWaveGestureTrigger : MonoBehaviour
+public class WaveGestureTrigger : MonoBehaviour
 {
     [Header("VR Transforms")]
     public Transform headTransform;
@@ -91,16 +91,9 @@ public class trWaveGestureTrigger : MonoBehaviour
 
     private void TriggerEvent()
     {
-        Debug.Log("<color=blue>[Wave] Geste détecté !</color>");
         if (OnWavePerformed != null)
         {
             OnWavePerformed.Invoke();
-        }
-        
-        GuideController guide = FindObjectOfType<GuideController>();
-        if (guide != null)
-        {
-            guide.ChangeState(1);
         }
     }
 }

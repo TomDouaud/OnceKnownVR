@@ -91,10 +91,6 @@ public class LLMService : MonoBehaviour
             Debug.LogWarning("[LLM] Already processing a request — ignoring.");
             return;
         }
-        
-        var guide = FindObjectOfType<GuideController>();
-        if (guide != null) guide.SetThinking(true);
-        
         StartCoroutine(StreamRequest(transcription, emotion, responsePrefix));
     }
 
