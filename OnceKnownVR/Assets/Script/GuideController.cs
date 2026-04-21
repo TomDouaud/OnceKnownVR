@@ -44,7 +44,13 @@ public class GuideController : MonoBehaviour
         if (e.CurrentPhase == TTSEventArgs.Phase.Complete)
         {
             Debug.Log("TTS has finished speaking the entire sequence!");
+            GetComponentInChildren<ThinkingBubble>().StopThinking();
             ChangeLockState(false);
+        }
+
+        if (e.CurrentPhase == TTSEventArgs.Phase.Started)
+        {
+            GetComponentInChildren<ThinkingBubble>().StartThinking();
         }
     }
 
